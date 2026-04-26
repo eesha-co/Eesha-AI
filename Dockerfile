@@ -7,7 +7,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
-COPY package.json bun.lock* package-lock.json* ./
+COPY package.json package-lock.json* ./
 
 # Install dependencies
 RUN npm install --legacy-peer-deps
@@ -26,13 +26,14 @@ FROM node:20-slim AS runner
 
 WORKDIR /app
 
-# Install runtime dependencies
+# Install runtime dependencies (python for code execution, git, etc.)
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     git \
     curl \
     wget \
+    sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set environment
@@ -41,7 +42,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=7860
 ENV HOST=0.0.0.0
 
-# Create workspace directory
+# Create directories
 RUN mkdir -p /app/workspace /app/data
 
 # Copy built application
@@ -52,22 +53,29 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
+# Copy prisma CLI for db push
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+
 # Set environment variables for runtime
 ENV WORKSPACE_ROOT=/app/workspace
 ENV DATABASE_URL=file:/app/data/eeshai.db
 
-# Initialize database on startup
-RUN npx prisma generate 2>/dev/null || true
-
 # Expose HF Space port
 EXPOSE 7860
 
-# Create startup script
-RUN echo '#!/bin/sh\n\
-cd /app\n\
-npx prisma db push --skip-generate 2>/dev/null || true\n\
-echo "Eesha AI starting on port 7860..."\n\
-node server.js\n'\
-> /app/start.sh && chmod +x /app/start.sh
+# Create startup script that initializes DB before starting
+RUN cat > /app/start.sh << 'EOF'
+#!/bin/sh
+cd /app
+
+# Initialize database
+echo "Initializing database..."
+export DATABASE_URL="file:/app/data/eeshai.db"
+npx prisma db push --skip-generate 2>&1 || echo "DB push failed, continuing..."
+
+echo "Eesha AI starting on port 7860..."
+node server.js
+EOF
+RUN chmod +x /app/start.sh
 
 CMD ["/app/start.sh"]

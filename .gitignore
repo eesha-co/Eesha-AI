@@ -1,69 +1,47 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
+# Dependencies
 node_modules
 /.pnp
 .pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
 
-# testing
-/coverage
-
-# next.js
+# Next.js
 /.next/
 /out/
 
-# production
+# Build
 /build
 
-# misc
+# Misc
 .DS_Store
 *.pem
 
-# debug
+# Debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# Env files
 .env*
+!.env.example
 
-# vercel
+# Vercel
 .vercel
 
-
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
-local-*
-.claude
-.z-ai-config
-*.log
-dev.log
-dev.out.log
-test
-prompt
 
-server.log
-# Skills directory
+# Skills directory (too large for HF)
 /skills/
 
 # Database
 /db/
+/data/
 
-# Workspace files (local sandbox)
+# Workspace
 /workspace/
 
-# Download directory
+# Download
 /download/
-
-# HF Space (deployed separately)
-/hf-space/
 
 # Examples
 /examples/
@@ -74,14 +52,18 @@ Caddyfile
 # Worklog
 worklog.md
 
-# Agent context
-/agent-ctx/
-
 # Z scripts
 /.zscripts/
 
 # Mini services
 /mini-services/
 
-# Keep .env.example but ignore .env
-!.env.example
+# Agent context
+/agent-ctx/
+
+# Lock files (optional - use package-lock.json instead of bun.lock)
+bun.lock
+
+# Large binary files
+*.bin
+*.exe

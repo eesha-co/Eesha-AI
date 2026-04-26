@@ -1,7 +1,6 @@
 import gradio as gr
 from openai import OpenAI
 import os
-import json
 
 # ──────────────────────────────────────────────────────────────
 # Kimi K2.5 Production AI Coding Assistant
@@ -45,32 +44,31 @@ When explaining:
 Be direct, accurate, and helpful. If you're unsure about something, say so rather than guessing."""
 
 
-def stream_chat(message, history, enable_thinking):
+def respond(message, chat_history, enable_thinking):
     """
     Stream a response from Kimi K2.5 via NVIDIA API.
-
-    With thinking mode enabled, Kimi first outputs its reasoning process
-    (chain-of-thought), then outputs the final answer. We stream both
-    phases so the user sees the AI "think" before it responds.
+    Uses Gradio's standard streaming chatbot pattern.
     """
     if not message.strip():
-        yield "Please enter a message."
+        yield message, chat_history
         return
 
     # Build conversation history in OpenAI message format
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    for user_msg, assistant_msg in history:
-        if user_msg:
-            messages.append({"role": "user", "content": user_msg})
-        if assistant_msg:
-            messages.append({"role": "assistant", "content": assistant_msg})
+    # chat_history is a list of [user_msg, assistant_msg] pairs
+    for pair in chat_history:
+        if len(pair) >= 2 and pair[0] and pair[1]:
+            messages.append({"role": "user", "content": pair[0]})
+            messages.append({"role": "assistant", "content": pair[1]})
 
     messages.append({"role": "user", "content": message})
 
+    # Add user message to chat history immediately
+    chat_history.append([message, ""])
+
     try:
         # Call NVIDIA's OpenAI-compatible streaming endpoint
-        # chat_template_kwargs: {"thinking": True} enables Kimi's chain-of-thought
         kwargs = {
             "model": MODEL_ID,
             "messages": messages,
@@ -102,9 +100,10 @@ def stream_chat(message, history, enable_thinking):
                     in_thinking_phase = True
                 thinking_content += delta.reasoning_content
 
-                # Show thinking in a collapsible section
-                display = f"<details open><summary>🧠 <b>Thinking...</b></summary>\n\n{thinking_content}\n\n</details>"
-                yield display
+                # Show thinking phase in the chat
+                display = f"🧠 **Thinking...**\n\n{thinking_content}"
+                chat_history[-1][1] = display
+                yield "", chat_history
 
             # Handle regular content
             if delta.content:
@@ -115,45 +114,37 @@ def stream_chat(message, history, enable_thinking):
                 response_content += delta.content
 
                 if thinking_content:
-                    # Show completed thinking + live response
                     display = (
-                        f"<details><summary>🧠 <b>Reasoning</b> (click to expand)</summary>\n\n"
-                        f"{thinking_content}\n\n</details>\n\n---\n\n"
+                        f"<details><summary>🧠 Reasoning (click to expand)</summary>\n\n"
+                        f"{thinking_content}\n\n</details>\n\n"
                         f"{response_content}"
                     )
                 else:
                     display = response_content
 
-                yield display
+                chat_history[-1][1] = display
+                yield "", chat_history
 
-        # Final output
-        if thinking_content and response_content:
-            yield (
-                f"<details><summary>🧠 <b>Reasoning</b> (click to expand)</summary>\n\n"
-                f"{thinking_content}\n\n</details>\n\n---\n\n"
-                f"{response_content}"
-            )
-        elif response_content:
-            yield response_content
-        elif thinking_content and not response_content:
-            yield (
-                f"<details open><summary>🧠 <b>Reasoning</b></summary>\n\n"
-                f"{thinking_content}\n\n</details>\n\n"
-                f"*The model reasoned but did not produce a final response. Try rephrasing your question.*"
-            )
-        else:
-            yield "No response received. Please try again."
+        # Final output — make sure something is there
+        if not chat_history[-1][1]:
+            if thinking_content:
+                chat_history[-1][1] = f"🧠 **Reasoning:**\n\n{thinking_content}"
+            else:
+                chat_history[-1][1] = "No response received. Please try again."
+
+        yield "", chat_history
 
     except Exception as e:
         error_msg = str(e)
         if "401" in error_msg or "auth" in error_msg.lower():
-            yield "❌ **Authentication Error**: Your NVIDIA_API_KEY is missing or invalid. Set it in your Hugging Face Space Secrets."
+            chat_history[-1][1] = "❌ **Authentication Error**: NVIDIA_API_KEY is missing or invalid. Set it in Space Secrets."
         elif "429" in error_msg:
-            yield "❌ **Rate Limit**: Too many requests. Please wait a moment and try again."
+            chat_history[-1][1] = "❌ **Rate Limit**: Too many requests. Wait a moment and try again."
         elif "500" in error_msg or "502" in error_msg or "503" in error_msg:
-            yield "❌ **Server Error**: NVIDIA's API is temporarily unavailable. Please try again in a few seconds."
+            chat_history[-1][1] = "❌ **Server Error**: NVIDIA API temporarily unavailable. Try again shortly."
         else:
-            yield f"❌ **Error**: {error_msg}"
+            chat_history[-1][1] = f"❌ **Error**: {error_msg}"
+        yield "", chat_history
 
 
 # ──────────────────────────────────────────────────────────────
@@ -168,11 +159,7 @@ with gr.Blocks(
         font=gr.themes.GoogleFont("Inter"),
     ),
     css="""
-        .contain { max-width: 900px; margin: auto; }
-        .model-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 9999px; background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.2); font-size: 12px; color: #a78bfa; }
-        .model-badge img { width: 14px; height: 14px; }
         footer { display: none !important; }
-        .gradio-container { background: #0a0a12 !important; }
     """,
     title="Kimi K2.5 — AI Coding Assistant",
 ) as demo:
@@ -198,15 +185,12 @@ with gr.Blocks(
     enable_thinking = gr.Checkbox(
         value=True,
         label="🧠 Enable Thinking Mode (chain-of-thought reasoning)",
-        info="When enabled, Kimi K2.5 shows its reasoning process before answering. Recommended for complex coding tasks."
+        info="When enabled, Kimi K2.5 shows its reasoning process before answering."
     )
 
     chatbot = gr.Chatbot(
         height=500,
-        type="messages",
         show_copy_button=True,
-        layout="bubble",
-        avatar_images=(None, "🤖"),
     )
 
     with gr.Row():
@@ -221,8 +205,8 @@ with gr.Blocks(
 
     gr.Examples(
         examples=[
-            "Build a REST API with authentication and validation in Node.js",
-            "Debug this Python function that's returning wrong results",
+            "Build a REST API with authentication in Node.js",
+            "Debug this Python function returning wrong results",
             "Refactor my React component for better performance",
             "Explain how async/await works in Rust",
             "Design a database schema for an e-commerce platform",
@@ -239,19 +223,16 @@ with gr.Blocks(
         </div>
     """)
 
-    # Wire up the chat
+    # Wire up the chat using Gradio's standard streaming pattern
     msg_input.submit(
-        stream_chat,
+        respond,
         inputs=[msg_input, chatbot, enable_thinking],
-        outputs=[chatbot],
+        outputs=[msg_input, chatbot],
     )
     submit_btn.click(
-        stream_chat,
+        respond,
         inputs=[msg_input, chatbot, enable_thinking],
-        outputs=[chatbot],
-    ).then(
-        lambda: "",
-        outputs=[msg_input],
+        outputs=[msg_input, chatbot],
     )
 
 

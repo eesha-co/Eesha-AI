@@ -28,8 +28,8 @@ export function ChatArea({ onRegenerate }: ChatAreaProps) {
 
   return (
     <ScrollArea className="flex-1">
-      <div className="mx-auto max-w-[768px] px-4 py-6">
-        <div className="flex flex-col gap-6">
+      <div className="mx-auto max-w-[768px] px-3 sm:px-4 py-4 sm:py-6">
+        <div className="flex flex-col gap-4 sm:gap-6">
           {messages.map((message, index) => (
             <Message
               key={message.id}

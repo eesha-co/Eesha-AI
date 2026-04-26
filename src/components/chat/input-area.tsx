@@ -47,15 +47,15 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
   );
 
   return (
-    <div className="shrink-0 border-t border-border bg-background/80 backdrop-blur-xl px-4 pb-4 pt-3">
+    <div className="shrink-0 border-t border-border bg-background/80 backdrop-blur-xl px-2 sm:px-4 pb-2 sm:pb-4 pt-2 sm:pt-3">
       <div className="mx-auto max-w-[768px]">
         {/* Input container */}
         <div className="input-glow relative rounded-2xl border border-border bg-card transition-all duration-300 focus-within:border-primary/30 focus-within:bg-card focus-within:shadow-lg focus-within:shadow-primary/5">
-          <div className="flex items-end gap-2 p-3">
-            {/* Model indicator */}
-            <div className="mb-0.5 flex items-center gap-1.5 shrink-0">
-              <div className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/15 to-cyan-500/15 border border-primary/10">
-                <img src="/logo-transparent.png" alt="" className="size-5 object-contain" />
+          <div className="flex items-end gap-2 p-2 sm:p-3">
+            {/* Model indicator - hidden on very small screens */}
+            <div className="mb-0.5 hidden sm:flex items-center gap-1.5 shrink-0">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/15 to-cyan-500/15 border border-primary/10">
+                <img src="/logo-transparent.png" alt="" className="size-7 object-contain" />
               </div>
             </div>
 
@@ -67,7 +67,7 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
               onKeyDown={handleKeyDown}
               placeholder="Ask Eesha AI to write, debug, or explain code..."
               rows={1}
-              className="max-h-[200px] min-h-[28px] flex-1 resize-none bg-transparent text-sm leading-relaxed text-foreground placeholder-muted-foreground outline-none"
+              className="max-h-[200px] min-h-[28px] flex-1 resize-none bg-transparent text-xs sm:text-sm leading-relaxed text-foreground placeholder-muted-foreground outline-none"
             />
 
             {/* Send / Stop button */}
@@ -113,7 +113,7 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
         </div>
 
         {/* Bottom info */}
-        <div className="mt-2 flex items-center justify-between px-1">
+        <div className="mt-1 sm:mt-2 hidden sm:flex items-center justify-between px-1">
           <div className="flex items-center gap-1.5">
             <Sparkles className="size-3 text-primary/40" />
             <span className="text-[11px] text-muted-foreground">Eesha AI with Thinking Mode</span>

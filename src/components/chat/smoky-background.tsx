@@ -81,7 +81,7 @@ export function SmokyBackground() {
           <img
             src="/logo-transparent.png"
             alt=""
-            className="w-[55vmin] h-[55vmin] object-contain opacity-[0.06] dark:opacity-[0.06] animate-pulse-soft"
+            className="w-[65vmin] h-[65vmin] object-contain opacity-[0.06] dark:opacity-[0.06] animate-pulse-soft"
             style={{ filter: 'brightness(1.1)' }}
           />
         </div>

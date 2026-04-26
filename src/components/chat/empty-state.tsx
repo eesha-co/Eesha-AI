@@ -24,11 +24,11 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
         className="relative mb-8"
       >
         {/* Glow behind logo */}
-        <div className="absolute inset-0 -m-6 rounded-full bg-gradient-to-br from-violet-500/10 via-cyan-500/5 to-violet-500/10 blur-2xl" />
+        <div className="absolute inset-0 -m-8 rounded-full bg-gradient-to-br from-violet-500/10 via-cyan-500/5 to-violet-500/10 blur-2xl" />
         <img
           src="/logo-transparent.png"
           alt="Eesha AI"
-          className="relative size-20 object-contain"
+          className="relative size-28 sm:size-32 object-contain"
         />
       </motion.div>
 
@@ -37,7 +37,7 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15, duration: 0.5 }}
-        className="mb-2 text-3xl font-semibold tracking-tight text-foreground"
+        className="mb-2 text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-foreground"
       >
         What do you want to build?
       </motion.h2>
@@ -47,7 +47,7 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.25, duration: 0.5 }}
-        className="mb-10 text-sm text-muted-foreground"
+        className="mb-8 sm:mb-10 text-xs sm:text-sm text-muted-foreground text-center max-w-xs sm:max-w-sm"
       >
         Eesha AI helps you write, debug, and deploy code with intelligence.
       </motion.p>
@@ -57,7 +57,7 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.35, duration: 0.5 }}
-        className="grid w-full max-w-lg grid-cols-2 gap-3"
+        className="grid w-full max-w-lg grid-cols-1 sm:grid-cols-2 gap-3"
       >
         {suggestions.map((s, i) => (
           <motion.button
@@ -66,7 +66,7 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 + i * 0.07, duration: 0.4 }}
             onClick={() => onSuggestionClick?.(s.text + ' ' + s.desc)}
-            className="group suggestion-card flex items-start gap-3 rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 hover:border-primary/20 hover:shadow-md hover:shadow-primary/5"
+            className="group suggestion-card flex items-start gap-3 rounded-xl border border-border bg-card p-3 sm:p-4 text-left transition-all duration-200 hover:border-primary/20 hover:shadow-md hover:shadow-primary/5"
           >
             <span className="mt-0.5 text-base text-primary/70">{s.icon}</span>
             <div>

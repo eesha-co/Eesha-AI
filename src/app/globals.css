@@ -501,3 +501,121 @@
   min-width: 2.5em !important;
   padding-right: 1em !important;
 }
+
+/* ===== Responsive Design ===== */
+
+/* Small phones (under 480px) */
+@media (max-width: 479px) {
+  .prose-chat {
+    font-size: 0.875rem;
+    line-height: 1.65;
+  }
+
+  .prose-chat h1 { font-size: 1.25rem; }
+  .prose-chat h2 { font-size: 1.125rem; }
+  .prose-chat h3 { font-size: 1rem; }
+
+  .code-block-container {
+    border-radius: 0.5rem;
+    margin: 0.5rem 0;
+  }
+
+  .code-block-container pre {
+    font-size: 0.75rem !important;
+  }
+
+  .input-glow::before {
+    display: none; /* Disable glow on small screens for performance */
+  }
+
+  .suggestion-card {
+    border-radius: 0.625rem;
+  }
+}
+
+/* Phones (480px - 639px) */
+@media (min-width: 480px) and (max-width: 639px) {
+  .prose-chat {
+    font-size: 0.9rem;
+  }
+}
+
+/* Tablets (640px - 1023px) */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .prose-chat {
+    font-size: 0.9375rem;
+  }
+}
+
+/* Large screens (1024px+) */
+@media (min-width: 1024px) {
+  .prose-chat {
+    font-size: 0.9375rem;
+  }
+}
+
+/* Touch devices — larger tap targets */
+@media (hover: none) and (pointer: coarse) {
+  .suggestion-card {
+    min-height: 56px;
+  }
+
+  button {
+    min-height: 32px;
+  }
+}
+
+/* Landscape orientation on mobile */
+@media (max-height: 500px) and (orientation: landscape) {
+  .animate-breathe,
+  .animate-breathe-slow,
+  .animate-logo-glow-spin,
+  .animate-pulse-soft {
+    animation-duration: 12s; /* Slower animations in landscape for performance */
+  }
+}
+
+/* High-DPI / Retina displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .code-block-container {
+    border-width: 0.5px;
+  }
+}
+
+/* Prefers reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-breathe,
+  .animate-breathe-slow,
+  .animate-logo-glow-spin,
+  .animate-pulse-soft,
+  .animate-glow-pulse,
+  .animate-gradient-border,
+  .animate-subtle-float,
+  .animate-status-pulse,
+  .animate-shimmer,
+  .animate-thinking-dot,
+  .animate-blink-cursor {
+    animation: none !important;
+  }
+
+  .input-glow::before {
+    animation: none !important;
+  }
+
+  .suggestion-card::before {
+    animation: none !important;
+  }
+}
+
+/* Print styles */
+@media print {
+  .smoky-background,
+  .input-glow::before {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+}

@@ -66,7 +66,7 @@ function ThinkingBubble({ thinking, isThinking }: { thinking: string; isThinking
 function ThinkingIndicator() {
   return (
     <div className="flex items-center gap-2 px-1">
-      <img src="/logo-transparent.png" alt="" className="size-4 object-contain animate-pulse" />
+      <img src="/logo-transparent.png" alt="" className="size-5 object-contain animate-pulse" />
       <span className="text-sm text-muted-foreground">Thinking</span>
       <span className="flex gap-0.5">
         <span className="animate-thinking-dot inline-block size-1.5 rounded-full bg-primary" style={{ animationDelay: '0ms' }} />
@@ -131,8 +131,8 @@ export function Message({ message, isStreaming, onRegenerate }: MessageProps) {
       className="group flex gap-3"
     >
       {/* Avatar */}
-      <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/15 to-cyan-500/15 border border-primary/10">
-        <img src="/logo-transparent.png" alt="" className="size-5 object-contain" />
+      <div className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/15 to-cyan-500/15 border border-primary/10">
+        <img src="/logo-transparent.png" alt="" className="size-7 object-contain" />
       </div>
 
       {/* Content */}

@@ -106,11 +106,11 @@ export function Sidebar() {
           {/* Header with branding */}
           <div className="flex items-center justify-between px-4 py-4">
             <div className="flex items-center gap-2.5">
-              <div className="flex size-9 items-center justify-center rounded-xl overflow-hidden bg-gradient-to-br from-violet-500/10 to-cyan-500/10 border border-primary/10">
-                <img src="/logo-transparent.png" alt="Eesha AI" className="size-7 object-contain" />
+              <div className="flex size-12 items-center justify-center rounded-xl overflow-hidden bg-gradient-to-br from-violet-500/10 to-cyan-500/10 border border-primary/10">
+                <img src="/logo-transparent.png" alt="Eesha AI" className="size-10 object-contain" />
               </div>
               <div>
-                <span className="block text-sm font-bold text-foreground">Eesha AI</span>
+                <span className="block text-base font-bold text-foreground">Eesha AI</span>
                 <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
                   <Zap className="size-2.5 text-amber-500" />
                   Advanced AI Model

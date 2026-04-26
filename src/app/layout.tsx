@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   keywords: ["Eesha AI", "AI", "coding assistant", "code generation", "coding agent"],
   authors: [{ name: "Eesha AI" }],
   icons: {
-    icon: ["/favicon.svg", "/logo.png"],
+    icon: ["/favicon-64.png", "/logo-256.png"],
   },
 };
 
@@ -29,7 +29,30 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var dark = window.matchMedia('(prefers-color-scheme: dark)');
+                  if (dark.matches) {
+                    document.documentElement.classList.add('dark');
+                  }
+                  dark.addEventListener('change', function(e) {
+                    if (e.matches) {
+                      document.documentElement.classList.add('dark');
+                    } else {
+                      document.documentElement.classList.remove('dark');
+                    }
+                  });
+                } catch(e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >

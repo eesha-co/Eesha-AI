@@ -108,7 +108,7 @@ export function Sidebar() {
           <div className="flex items-center justify-between px-4 py-4">
             <div className="flex items-center gap-2.5">
               <div className="flex size-8 items-center justify-center rounded-lg overflow-hidden">
-                <img src="/logo.png" alt="Eesha AI" className="size-8" />
+                <img src="/logo-256.png" alt="Eesha AI" className="size-8" />
               </div>
               <div>
                 <span className="block text-sm font-bold text-white">Eesha AI</span>

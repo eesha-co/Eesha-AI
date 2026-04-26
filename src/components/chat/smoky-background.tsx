@@ -62,9 +62,9 @@ export function SmokyBackground() {
             />
           </div>
 
-          {/* The actual logo PNG — HUGE and semi-transparent */}
+          {/* The actual logo — HUGE and semi-transparent */}
           <img
-            src="/logo.png"
+            src="/logo-full.webp"
             alt=""
             className="w-[50vmin] h-[50vmin] object-contain opacity-[0.07]"
             style={{ filter: 'brightness(1.2) contrast(1.1)' }}

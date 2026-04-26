@@ -70,7 +70,7 @@ export default function Home() {
   );
 
   return (
-    <div className="flex h-screen bg-[#0a0a12]">
+    <div className="flex h-screen bg-background">
       {/* Smoky background effect */}
       <SmokyBackground />
       {/* Sidebar */}
@@ -79,7 +79,7 @@ export default function Home() {
       {/* Main content */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar with panel toggles */}
-        <div className="flex h-11 items-center justify-between border-b border-white/[0.06] bg-[#0a0a12]/80 px-3 backdrop-blur-xl">
+        <div className="flex h-11 items-center justify-between border-b border-border bg-background/80 px-3 backdrop-blur-xl">
           <Header />
 
           {/* Panel toggle buttons */}
@@ -87,7 +87,7 @@ export default function Home() {
             <Button
               variant="ghost"
               size="sm"
-              className={`h-7 gap-1.5 text-xs ${activePanel === 'chat' ? 'bg-white/[0.06] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+              className={`h-7 gap-1.5 text-xs ${activePanel === 'chat' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={() => { setActivePanel('chat'); setShowWorkspace(false); setShowTerminal(false); }}
             >
               <MessageSquare className="size-3" />
@@ -96,7 +96,7 @@ export default function Home() {
             <Button
               variant="ghost"
               size="sm"
-              className={`h-7 gap-1.5 text-xs ${showWorkspace ? 'bg-white/[0.06] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+              className={`h-7 gap-1.5 text-xs ${showWorkspace ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={() => setShowWorkspace(!showWorkspace)}
             >
               <Code2 className="size-3" />
@@ -105,7 +105,7 @@ export default function Home() {
             <Button
               variant="ghost"
               size="sm"
-              className={`h-7 gap-1.5 text-xs ${showTerminal ? 'bg-white/[0.06] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+              className={`h-7 gap-1.5 text-xs ${showTerminal ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={() => setShowTerminal(!showTerminal)}
             >
               <Terminal className="size-3" />
@@ -117,7 +117,7 @@ export default function Home() {
         {/* Content area with panels */}
         <div className="flex flex-1 min-h-0">
           {/* Chat panel */}
-          <div className={`flex flex-col ${showWorkspace || showTerminal ? 'w-1/2 border-r border-white/[0.06]' : 'flex-1'}`}>
+          <div className={`flex flex-col ${showWorkspace || showTerminal ? 'w-1/2 border-r border-border' : 'flex-1'}`}>
             {hasMessages ? (
               <ChatArea onRegenerate={() => {
                 if (activeConversation) {
@@ -165,7 +165,7 @@ export default function Home() {
                   <CodeEditor />
                 </div>
               </div>
-              <div className="h-48 shrink-0 border-t border-white/[0.06]">
+              <div className="h-48 shrink-0 border-t border-border">
                 <TerminalPanel />
               </div>
             </div>

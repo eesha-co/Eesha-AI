@@ -76,8 +76,8 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
           <div className="absolute inset-0 -m-3 rounded-full bg-gradient-to-r from-violet-500/25 to-cyan-500/25 blur-xl" />
 
           {/* Logo */}
-          <div className="animate-glow-pulse relative flex size-20 items-center justify-center rounded-2xl border border-white/[0.1] bg-gradient-to-br from-violet-600/20 to-cyan-600/20 shadow-2xl shadow-violet-500/20 backdrop-blur-sm">
-            <Code2 className="size-10 text-violet-300" />
+          <div className="animate-glow-pulse relative flex size-20 items-center justify-center rounded-2xl border border-white/[0.1] bg-gradient-to-br from-violet-600/20 to-cyan-600/20 shadow-2xl shadow-violet-500/20 backdrop-blur-sm overflow-hidden">
+            <img src="/logo.svg" alt="Eesha AI" className="size-14" />
           </div>
         </div>
       </motion.div>
@@ -94,7 +94,7 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
         variants={itemVariants}
         className="mb-8 max-w-md text-center text-sm text-zinc-500"
       >
-        Kimi K2.5 with thinking mode — powered by NVIDIA H100s. Write, debug, explain, and review any code with deep reasoning.
+        Eesha AI with thinking mode — powered by Kimi K2.5 on NVIDIA H100s. Write, debug, explain, and deploy code with deep reasoning.
       </motion.p>
 
       {/* Model badge */}

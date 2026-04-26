@@ -6,6 +6,7 @@ import { useChatStore, Conversation } from '@/stores/chat-store';
 import { Plus, MessageSquare, Trash2, PanelLeftClose, Code2, Search, Settings, X, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import Image from 'next/image';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -106,14 +107,14 @@ export function Sidebar() {
           {/* Header with branding */}
           <div className="flex items-center justify-between px-4 py-4">
             <div className="flex items-center gap-2.5">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-cyan-600 shadow-lg shadow-violet-500/20">
-                <Code2 className="size-4 text-white" />
+              <div className="flex size-8 items-center justify-center rounded-lg overflow-hidden">
+                <img src="/logo.svg" alt="Eesha AI" className="size-8" />
               </div>
               <div>
-                <span className="block text-sm font-bold text-white">Kimi K2.5</span>
+                <span className="block text-sm font-bold text-white">Eesha AI</span>
                 <span className="flex items-center gap-1 text-[10px] text-zinc-500">
                   <Zap className="size-2.5 text-amber-400" />
-                  Powered by NVIDIA
+                  Powered by Kimi K2.5
                 </span>
               </div>
             </div>
@@ -222,7 +223,7 @@ export function Sidebar() {
                 <span className="animate-status-pulse absolute inline-flex size-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
               </span>
-              <span className="text-[11px] text-zinc-500">Kimi K2.5 via NVIDIA API</span>
+              <span className="text-[11px] text-zinc-500">Eesha AI via NVIDIA API</span>
             </div>
           </div>
         </div>

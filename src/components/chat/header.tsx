@@ -1,8 +1,9 @@
 'use client';
 
 import { useChatStore } from '@/stores/chat-store';
-import { PanelLeft, Code2 } from 'lucide-react';
+import { PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import Image from 'next/image';
 
 export function Header() {
   const { sidebarOpen, setSidebarOpen, activeConversationId, conversations } = useChatStore();
@@ -23,11 +24,9 @@ export function Header() {
             <PanelLeft className="size-4" />
           </Button>
           <div className="flex items-center gap-2">
-            <div className="flex size-6 items-center justify-center rounded-md bg-gradient-to-br from-violet-600 to-cyan-600">
-              <Code2 className="size-3 text-white" />
-            </div>
+            <img src="/logo.svg" alt="Eesha AI" className="size-6" />
             <span className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-sm font-semibold text-transparent">
-              Kimi K2.5
+              Eesha AI
             </span>
           </div>
         </>

@@ -13,6 +13,7 @@ import { CodeEditor } from '@/components/workspace/code-editor';
 import { TerminalPanel } from '@/components/workspace/terminal';
 import { Button } from '@/components/ui/button';
 import { Code2, Terminal, PanelRight, MessageSquare, LayoutDashboard } from 'lucide-react';
+import { SmokyBackground } from '@/components/chat/smoky-background';
 
 type ActivePanel = 'chat' | 'workspace' | 'terminal';
 
@@ -70,6 +71,8 @@ export default function Home() {
 
   return (
     <div className="flex h-screen bg-[#0a0a12]">
+      {/* Smoky background effect */}
+      <SmokyBackground />
       {/* Sidebar */}
       <Sidebar />
 

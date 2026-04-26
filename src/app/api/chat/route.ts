@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { db, isDatabaseAvailable } from '@/lib/db';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
@@ -7,7 +7,7 @@ import { exec } from 'child_process';
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 
-const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || '/home/z/my-project/workspace';
+const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || '/app/workspace';
 
 function safePath(relativePath: string): string {
   const resolved = path.resolve(WORKSPACE_ROOT, relativePath);
@@ -83,7 +83,7 @@ List contents of a directory in the workspace.
 - After using tools, briefly explain what you did.
 - Paths are relative to the workspace root.`;
 
-const SYSTEM_PROMPT = `You are Kimi K2.5, an advanced AI coding agent built by Moonshot AI. You are an expert in software engineering across all programming languages and frameworks.
+const SYSTEM_PROMPT = `You are Eesha AI, an advanced AI coding agent powered by Kimi K2.5. You are an expert in software engineering across all programming languages and frameworks.
 
 ${TOOLS_PROMPT}
 
@@ -97,7 +97,6 @@ You are a CODING AGENT, not just a chatbot. When users ask you to build somethin
 Be proactive — if someone asks you to build an API, create the files and run them. Don't just describe what to do — DO it.`;
 
 // Parse tool calls from AI response text
-// Kimi K2.5 uses native tool calling format: <|tool_calls_section_begin|> <|tool_call_begin|> functions.create_file:0 <|tool_call_argument_begin|> {"path":"..."} <|tool_call_end|>
 function parseToolCalls(text: string): { toolCalls: any[]; cleanText: string } {
   const toolCalls: any[] = [];
   let cleanText = text;
@@ -113,7 +112,7 @@ function parseToolCalls(text: string): { toolCalls: any[]; cleanText: string } {
     } catch { /* skip */ }
   }
 
-  // Format 2: Kimi native format <|tool_call_begin|> functions.tool_name:index <|tool_call_argument_begin|> JSON <|tool_call_end|>
+  // Format 2: Kimi native format
   const regex2 = /<\|tool_call_begin\|>\s*functions\.(\w+):\d+\s*<\|tool_call_argument_begin\|>\s*([\s\S]*?)<\|tool_call_end\|>/g;
   while ((match = regex2.exec(text)) !== null) {
     try {
@@ -143,14 +142,14 @@ async function executeTool(toolCall: any): Promise<string> {
         const fullPath = safePath(toolCall.path);
         await fs.mkdir(path.dirname(fullPath), { recursive: true });
         await fs.writeFile(fullPath, toolCall.content || '', 'utf-8');
-        return `✅ File created: ${toolCall.path}`;
+        return `File created: ${toolCall.path}`;
       }
       case 'edit_file': {
         const fullPath = safePath(toolCall.path);
         let content = await fs.readFile(fullPath, 'utf-8');
         content = content.replace(toolCall.old, toolCall.new);
         await fs.writeFile(fullPath, content, 'utf-8');
-        return `✅ File edited: ${toolCall.path}`;
+        return `File edited: ${toolCall.path}`;
       }
       case 'run_command': {
         const result = await runCommand(toolCall.command, toolCall.cwd);
@@ -158,24 +157,24 @@ async function executeTool(toolCall: any): Promise<string> {
         if (result.stdout) output.push(result.stdout);
         if (result.stderr) output.push(`STDERR: ${result.stderr}`);
         output.push(`Exit code: ${result.exitCode}`);
-        return `🖥️ Command: \`${toolCall.command}\`\n${output.join('\n')}`;
+        return `Command: ${toolCall.command}\n${output.join('\n')}`;
       }
       case 'read_file': {
         const fullPath = safePath(toolCall.path);
         const content = await fs.readFile(fullPath, 'utf-8');
-        return `📄 ${toolCall.path}:\n\`\`\`\n${content}\n\`\`\``;
+        return `${toolCall.path}:\n\`\`\`\n${content}\n\`\`\``;
       }
       case 'list_dir': {
         const dirPath = safePath(toolCall.path || '');
         const entries = await fs.readdir(dirPath, { withFileTypes: true });
-        const listing = entries.map(e => `${e.isDirectory() ? '📁' : '📄'} ${e.name}`).join('\n');
-        return `📂 ${toolCall.path || '/'}:\n${listing || '(empty)'}`;
+        const listing = entries.map(e => `${e.isDirectory() ? 'DIR' : 'FILE'} ${e.name}`).join('\n');
+        return `${toolCall.path || '/'}:\n${listing || '(empty)'}`;
       }
       default:
-        return `❌ Unknown tool: ${toolCall.tool}`;
+        return `Unknown tool: ${toolCall.tool}`;
     }
   } catch (error) {
-    return `❌ Error executing ${toolCall.tool}: ${String(error)}`;
+    return `Error executing ${toolCall.tool}: ${String(error)}`;
   }
 }
 
@@ -197,21 +196,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Save user message
+    // Save user message to database (graceful fallback)
     const lastMessage = messages[messages.length - 1];
-    if (lastMessage.role === 'user' && conversationId) {
-      await db.message.create({
-        data: { role: 'user', content: lastMessage.content, conversationId },
-      });
+    if (lastMessage.role === 'user' && conversationId && isDatabaseAvailable()) {
+      try {
+        await db.message.create({
+          data: { role: 'user', content: lastMessage.content, conversationId },
+        });
+      } catch (dbError) {
+        console.error('Failed to save user message:', dbError);
+      }
     }
 
     // Auto-generate title
-    if (conversationId && messages.length === 1) {
-      const title = lastMessage.content.slice(0, 60) + (lastMessage.content.length > 60 ? '...' : '');
-      await db.conversation.update({
-        where: { id: conversationId },
-        data: { title },
-      });
+    if (conversationId && messages.length === 1 && isDatabaseAvailable()) {
+      try {
+        const title = lastMessage.content.slice(0, 60) + (lastMessage.content.length > 60 ? '...' : '');
+        await db.conversation.update({
+          where: { id: conversationId },
+          data: { title },
+        });
+      } catch (dbError) {
+        console.error('Failed to update title:', dbError);
+      }
     }
 
     // Build message list for NVIDIA API
@@ -229,11 +236,9 @@ export async function POST(req: NextRequest) {
     const readableStream = new ReadableStream({
       async start(controller) {
         try {
-          // Agent loop: call AI, execute tools, repeat if needed
           const MAX_ITERATIONS = 5;
 
           for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-            // Call NVIDIA API
             const nvidiaResponse = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
               method: 'POST',
               headers: {
@@ -253,11 +258,10 @@ export async function POST(req: NextRequest) {
 
             if (!nvidiaResponse.ok) {
               const errorText = await nvidiaResponse.text();
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', content: `NVIDIA API error: ${nvidiaResponse.status}` })}\n\n`));
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', content: `NVIDIA API error: ${nvidiaResponse.status} - ${errorText.slice(0, 200)}` })}\n\n`));
               break;
             }
 
-            // Stream response
             const reader = nvidiaResponse.body?.getReader();
             if (!reader) break;
 
@@ -288,7 +292,6 @@ export async function POST(req: NextRequest) {
                     iterationResponse += content;
                     fullResponse += content;
 
-                    // Filter out Kimi's native tool call markers from user-visible stream
                     const filteredContent = content
                       .replace(/<\|tool_calls_section_begin\|>/g, '')
                       .replace(/<\|tool_call_begin\|>/g, '')
@@ -305,15 +308,12 @@ export async function POST(req: NextRequest) {
               }
             }
 
-            // Check for tool calls in the response
-            const { toolCalls, cleanText } = parseToolCalls(iterationResponse);
+            const { toolCalls } = parseToolCalls(iterationResponse);
 
             if (toolCalls.length === 0) {
-              // No tools to execute — we're done
               break;
             }
 
-            // Execute tools and send results
             const toolResults: string[] = [];
             for (const toolCall of toolCalls) {
               controller.enqueue(
@@ -328,26 +328,28 @@ export async function POST(req: NextRequest) {
               );
             }
 
-            // Add assistant response and tool results to message history for next iteration
             aiMessages.push({ role: 'assistant', content: iterationResponse });
             aiMessages.push({
               role: 'user',
               content: `Tool execution results:\n\n${toolResults.join('\n\n---\n\n')}\n\nContinue based on these results. If everything is working, summarize what you did. If there are errors, fix them.`,
             });
 
-            // Also update fullResponse with tool results for the client
             fullResponse += `\n\n${toolResults.join('\n\n')}`;
           }
 
-          // Save assistant response to database
-          if (conversationId && fullResponse) {
-            await db.message.create({
-              data: { role: 'assistant', content: fullResponse, conversationId },
-            });
-            await db.conversation.update({
-              where: { id: conversationId },
-              data: { updatedAt: new Date() },
-            });
+          // Save assistant response to database (graceful fallback)
+          if (conversationId && fullResponse && isDatabaseAvailable()) {
+            try {
+              await db.message.create({
+                data: { role: 'assistant', content: fullResponse, conversationId },
+              });
+              await db.conversation.update({
+                where: { id: conversationId },
+                data: { updatedAt: new Date() },
+              });
+            } catch (dbError) {
+              console.error('Failed to save assistant message:', dbError);
+            }
           }
 
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));

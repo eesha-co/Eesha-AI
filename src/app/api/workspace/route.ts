@@ -4,7 +4,7 @@ import path from 'path';
 
 export const runtime = 'nodejs';
 
-const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || '/home/z/my-project/workspace';
+const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || '/app/workspace';
 
 // Security: ensure path stays within workspace
 function safePath(relativePath: string): string {

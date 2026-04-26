@@ -6,7 +6,7 @@ import path from 'path';
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
-const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || '/home/z/my-project/workspace';
+const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || '/app/workspace';
 
 // POST — execute a command in the workspace
 export async function POST(req: NextRequest) {

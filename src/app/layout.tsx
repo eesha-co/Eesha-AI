@@ -19,10 +19,7 @@ export const metadata: Metadata = {
   keywords: ["Eesha AI", "AI", "coding assistant", "code generation", "coding agent"],
   authors: [{ name: "Eesha AI" }],
   icons: {
-    icon: [
-      { url: "/logo-transparent.png", type: "image/png", sizes: "256x256" },
-    ],
-    apple: "/logo-transparent.png",
+    icon: ["/favicon-64.png", "/logo-256.png"],
   },
 };
 

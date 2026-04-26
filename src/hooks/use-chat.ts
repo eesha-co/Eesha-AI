@@ -91,57 +91,58 @@ export function useChat() {
         const decoder = new TextDecoder();
         let fullContent = '';
         let toolExecuted = false;
+        let sseBuffer = ''; // Buffer for partial SSE lines
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const text = decoder.decode(value, { stream: true });
-          const lines = text.split('\n');
+          sseBuffer += decoder.decode(value, { stream: true });
+          const lines = sseBuffer.split('\n');
+          sseBuffer = lines.pop() || ''; // Keep incomplete line in buffer
 
           for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
-              if (data === '[DONE]') continue;
-              try {
-                const parsed = JSON.parse(data);
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('data: ')) continue;
 
-                if (parsed.type === 'content' && parsed.content) {
-                  fullContent += parsed.content;
+            const data = trimmed.slice(6);
+            if (data === '[DONE]') continue;
+
+            try {
+              const parsed = JSON.parse(data);
+
+              if (parsed.type === 'content' && parsed.content) {
+                fullContent += parsed.content;
+                updateLastAssistantMessage(conversationId, fullContent);
+              }
+
+              if (parsed.type === 'tool_start') {
+                toolExecuted = true;
+                const toolLabel = getToolLabel(parsed.tool, parsed.path, parsed.command);
+                fullContent += `\n\n${toolLabel}\n`;
+                updateLastAssistantMessage(conversationId, fullContent);
+              }
+
+              if (parsed.type === 'tool_result' && parsed.result) {
+                // Format tool result nicely
+                const resultText = formatToolResult(parsed.tool, parsed.result);
+                fullContent += `${resultText}\n`;
+                updateLastAssistantMessage(conversationId, fullContent);
+              }
+
+              if (parsed.type === 'error') {
+                console.error('Stream error:', parsed.content);
+                // Don't override the entire message with an error — just append a note
+                if (fullContent) {
+                  fullContent += `\n\n*Note: There was an issue with the response. Some content may be incomplete.*`;
+                  updateLastAssistantMessage(conversationId, fullContent);
+                } else {
+                  fullContent = 'I encountered an issue processing your request. Please try again.';
                   updateLastAssistantMessage(conversationId, fullContent);
                 }
-
-                if (parsed.type === 'tool_start') {
-                  toolExecuted = true;
-                  // Add tool indicator to the response
-                  const toolLabel = parsed.tool === 'create_file'
-                    ? `📄 Creating ${parsed.path}...`
-                    : parsed.tool === 'edit_file'
-                    ? `✏️ Editing ${parsed.path}...`
-                    : parsed.tool === 'run_command'
-                    ? `🖥️ Running: ${parsed.command}...`
-                    : parsed.tool === 'read_file'
-                    ? `📖 Reading ${parsed.path}...`
-                    : parsed.tool === 'list_dir'
-                    ? `📂 Listing ${parsed.path || '/'}...`
-                    : `🔧 ${parsed.tool}...`;
-
-                  fullContent += `\n\n${toolLabel}\n`;
-                  updateLastAssistantMessage(conversationId, fullContent);
-                }
-
-                if (parsed.type === 'tool_result' && parsed.result) {
-                  fullContent += `${parsed.result}\n`;
-                  updateLastAssistantMessage(conversationId, fullContent);
-                }
-
-                if (parsed.type === 'error') setError(parsed.content);
-                if (!parsed.type && parsed.content) {
-                  fullContent += parsed.content;
-                  updateLastAssistantMessage(conversationId, fullContent);
-                }
-              } catch { /* skip */ }
-            }
+                setError(parsed.content);
+              }
+            } catch { /* skip malformed JSON */ }
           }
         }
 
@@ -165,13 +166,24 @@ export function useChat() {
         }
       } catch (err: unknown) {
         if (err instanceof Error && err.name === 'AbortError') {
-          // cancelled
-        } else {
-          const msg = err instanceof Error ? err.message : 'Failed to get response';
-          setError(msg);
+          // User cancelled — don't show error
+          return;
+        }
+
+        const msg = err instanceof Error ? err.message : 'Failed to get response';
+        console.error('Chat error:', msg);
+        setError(msg);
+
+        // Only show error message if we haven't received any content yet
+        // If we already have content, the partial response is still useful
+        const currentConv = useChatStore.getState().conversations.find(
+          (c) => c.id === conversationId
+        );
+        const lastMsg = currentConv?.messages[currentConv.messages.length - 1];
+        if (!lastMsg?.content || lastMsg.content.trim() === '') {
           updateLastAssistantMessage(
             conversationId,
-            '⚠️ Unable to generate a response. Please try again.'
+            'I encountered an issue processing your request. Please try again.'
           );
         }
       } finally {
@@ -189,4 +201,50 @@ export function useChat() {
   }, []);
 
   return { sendMessage, stopStreaming, error, setError };
+}
+
+// ─── Helper functions ─────────────────────────────────────────────────────────
+
+function getToolLabel(tool: string, filePath: string, command: string): string {
+  switch (tool) {
+    case 'create_file':
+      return `**Creating file:** \`${filePath}\``;
+    case 'edit_file':
+      return `**Editing file:** \`${filePath}\``;
+    case 'read_file':
+      return `**Reading file:** \`${filePath}\``;
+    case 'delete_file':
+      return `**Deleting:** \`${filePath}\``;
+    case 'list_dir':
+      return `**Listing directory:** \`${filePath || '/'}\``;
+    case 'run_command':
+      return `**Running command:** \`${command}\``;
+    default:
+      return `**Executing:** ${tool}`;
+  }
+}
+
+function formatToolResult(tool: string, result: string): string {
+  // Truncate very long outputs
+  const maxLength = 2000;
+  const truncated = result.length > maxLength
+    ? result.slice(0, maxLength) + '\n... (output truncated)'
+    : result;
+
+  switch (tool) {
+    case 'create_file':
+      return `<details><summary>File created</summary>\n\n\`\`\`\n${truncated}\n\`\`\`\n</details>`;
+    case 'edit_file':
+      return `<details><summary>File edited</summary>\n\n\`\`\`\n${truncated}\n\`\`\`\n</details>`;
+    case 'run_command':
+      return `<details><summary>Command output</summary>\n\n\`\`\`\n${truncated}\n\`\`\`\n</details>`;
+    case 'read_file':
+      return `<details><summary>File contents</summary>\n\n\`\`\`\n${truncated}\n\`\`\`\n</details>`;
+    case 'delete_file':
+      return truncated;
+    case 'list_dir':
+      return `<details><summary>Directory listing</summary>\n\n\`\`\`\n${truncated}\n\`\`\`\n</details>`;
+    default:
+      return truncated;
+  }
 }

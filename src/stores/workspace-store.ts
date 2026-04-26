@@ -6,6 +6,8 @@ export interface FileEntry {
   type: 'file' | 'directory';
   size?: number;
   modified?: string;
+  language?: string;
+  isBinary?: boolean;
 }
 
 export interface OpenFile {

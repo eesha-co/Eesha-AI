@@ -3,86 +3,71 @@
 export function SmokyBackground() {
   return (
     <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true">
-      {/* x.ai-style smoky light sweep from top-right */}
+      {/* x.ai-style smoky light from top-right — breathing animation */}
       <div
-        className="absolute top-[-20%] right-[-10%] w-[70%] h-[70%] animate-breathe"
+        className="absolute top-[-10%] right-[-5%] w-[60%] h-[60%] animate-breathe"
         style={{
-          background: 'radial-gradient(ellipse at center, rgba(120, 160, 255, 0.06) 0%, rgba(90, 130, 255, 0.03) 30%, rgba(60, 100, 255, 0.01) 60%, transparent 80%)',
+          background: 'radial-gradient(ellipse at center, rgba(160, 195, 255, 0.07) 0%, rgba(120, 165, 255, 0.04) 30%, rgba(80, 130, 255, 0.015) 60%, transparent 80%)',
         }}
       />
 
       {/* Secondary light from mid-right — slower breathing */}
       <div
-        className="absolute bottom-[5%] right-[-8%] w-[50%] h-[50%] animate-breathe-slow"
+        className="absolute bottom-[10%] right-[-5%] w-[40%] h-[40%] animate-breathe-slow"
         style={{
-          background: 'radial-gradient(ellipse at center, rgba(100, 140, 255, 0.04) 0%, rgba(70, 110, 255, 0.02) 40%, transparent 70%)',
+          background: 'radial-gradient(ellipse at center, rgba(100, 160, 255, 0.05) 0%, rgba(70, 120, 255, 0.025) 40%, transparent 70%)',
         }}
       />
 
       {/* Subtle ambient glow bottom-left */}
       <div
-        className="absolute bottom-[-20%] left-[-15%] w-[55%] h-[55%]"
+        className="absolute bottom-[-15%] left-[-10%] w-[50%] h-[50%]"
         style={{
-          background: 'radial-gradient(ellipse at center, rgba(124, 58, 237, 0.03) 0%, transparent 60%)',
+          background: 'radial-gradient(ellipse at center, rgba(100, 80, 200, 0.03) 0%, transparent 60%)',
         }}
       />
 
-      {/* Light sweep animation - like x.ai's moving light */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div
-          className="absolute top-0 right-0 w-[200%] h-[40%] opacity-[0.03]"
-          style={{
-            background: 'linear-gradient(-15deg, transparent 40%, rgba(150, 180, 255, 0.8) 50%, transparent 60%)',
-            animation: 'light-sweep 12s ease-in-out infinite',
-          }}
-        />
-      </div>
-
-      {/* ===== HUGE centered logo watermark ===== */}
+      {/* Centered logo watermark — HUGE */}
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="relative">
-          {/* Rotating glow ring — animated blue glow circling the logo */}
-          <div className="absolute inset-0 animate-logo-glow-spin">
+          {/* Rotating glow ring — spins around the logo */}
+          <div className="absolute inset-0 animate-[spin_25s_linear_infinite]">
             {/* Top glow spot */}
             <div
-              className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-[30%] w-[40vmin] h-[40vmin] rounded-full"
+              className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[35vmin] h-[35vmin] rounded-full blur-[80px]"
               style={{
-                background: 'radial-gradient(circle, rgba(100, 160, 255, 0.15) 0%, rgba(70, 130, 255, 0.06) 40%, transparent 70%)',
-                filter: 'blur(60px)',
+                background: 'radial-gradient(circle, rgba(100, 170, 255, 0.12) 0%, rgba(80, 140, 255, 0.05) 40%, transparent 70%)',
               }}
             />
             {/* Bottom glow spot */}
             <div
-              className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-[30%] w-[35vmin] h-[35vmin] rounded-full"
+              className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-[30vmin] h-[30vmin] rounded-full blur-[80px]"
               style={{
-                background: 'radial-gradient(circle, rgba(130, 170, 255, 0.12) 0%, rgba(100, 145, 255, 0.05) 40%, transparent 70%)',
-                filter: 'blur(60px)',
+                background: 'radial-gradient(circle, rgba(130, 180, 255, 0.1) 0%, rgba(100, 150, 255, 0.04) 40%, transparent 70%)',
               }}
             />
             {/* Left glow spot */}
             <div
-              className="absolute left-0 top-1/2 -translate-x-[30%] -translate-y-1/2 w-[33vmin] h-[33vmin] rounded-full"
+              className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[28vmin] h-[28vmin] rounded-full blur-[80px]"
               style={{
-                background: 'radial-gradient(circle, rgba(140, 180, 255, 0.11) 0%, rgba(110, 155, 255, 0.04) 40%, transparent 70%)',
-                filter: 'blur(60px)',
+                background: 'radial-gradient(circle, rgba(140, 190, 255, 0.09) 0%, rgba(110, 160, 255, 0.035) 40%, transparent 70%)',
               }}
             />
             {/* Right glow spot */}
             <div
-              className="absolute right-0 top-1/2 translate-x-[30%] -translate-y-1/2 w-[37vmin] h-[37vmin] rounded-full"
+              className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-[32vmin] h-[32vmin] rounded-full blur-[80px]"
               style={{
-                background: 'radial-gradient(circle, rgba(110, 165, 255, 0.14) 0%, rgba(80, 135, 255, 0.055) 40%, transparent 70%)',
-                filter: 'blur(60px)',
+                background: 'radial-gradient(circle, rgba(120, 175, 255, 0.11) 0%, rgba(90, 145, 255, 0.045) 40%, transparent 70%)',
               }}
             />
           </div>
 
           {/* The actual logo — HUGE and semi-transparent */}
           <img
-            src="/logo-transparent.png"
+            src="/logo-full.webp"
             alt=""
-            className="w-[65vmin] h-[65vmin] object-contain opacity-[0.06] dark:opacity-[0.06] animate-pulse-soft"
-            style={{ filter: 'brightness(1.1)' }}
+            className="w-[50vmin] h-[50vmin] object-contain opacity-[0.07]"
+            style={{ filter: 'brightness(1.2) contrast(1.1)' }}
           />
         </div>
       </div>

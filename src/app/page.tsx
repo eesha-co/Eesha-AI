@@ -12,8 +12,10 @@ import { FileExplorer } from '@/components/workspace/file-explorer';
 import { CodeEditor } from '@/components/workspace/code-editor';
 import { TerminalPanel } from '@/components/workspace/terminal';
 import { Button } from '@/components/ui/button';
-import { Code2, Terminal, MessageSquare } from 'lucide-react';
+import { Code2, Terminal, MessageSquare, X } from 'lucide-react';
 import { SmokyBackground } from '@/components/chat/smoky-background';
+
+type ActivePanel = 'chat' | 'workspace' | 'terminal';
 
 export default function Home() {
   const {
@@ -22,6 +24,7 @@ export default function Home() {
     setConversations,
     setActiveConversation,
     isStreaming,
+    sidebarOpen,
   } = useChatStore();
 
   const { sendMessage, stopStreaming } = useChat();
@@ -65,61 +68,57 @@ export default function Home() {
     [setActiveConversation, sendMessage]
   );
 
-  const hasPanelOpen = showWorkspace || showTerminal;
+  const toggleWorkspace = useCallback(() => {
+    setShowWorkspace((prev) => !prev);
+  }, []);
+
+  const toggleTerminal = useCallback(() => {
+    setShowTerminal((prev) => !prev);
+  }, []);
+
+  const hasSidePanel = showWorkspace || showTerminal;
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      {/* Smoky background effect */}
       <SmokyBackground />
-
-      {/* Sidebar — handles mobile drawer internally */}
       <Sidebar />
-
-      {/* Main content */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* Top bar with panel toggles */}
-        <div className="flex h-12 sm:h-11 items-center justify-between border-b border-border bg-background/80 backdrop-blur-xl px-2 sm:px-3 shrink-0">
+        {/* Header bar */}
+        <div className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-background/80 px-3 backdrop-blur-xl">
           <Header />
-
-          {/* Panel toggle buttons */}
-          <div className="flex items-center gap-0.5 sm:gap-1">
+          <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="sm"
-              className={`h-8 sm:h-7 gap-1 sm:gap-1.5 text-[11px] sm:text-xs px-2 sm:px-3 ${!hasPanelOpen ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`h-7 gap-1.5 text-xs ${!hasSidePanel ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={() => { setShowWorkspace(false); setShowTerminal(false); }}
             >
-              <MessageSquare className="size-3" />
-              <span className="hidden sm:inline">Chat</span>
+              <MessageSquare className="size-3" />Chat
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              className={`h-8 sm:h-7 gap-1 sm:gap-1.5 text-[11px] sm:text-xs px-2 sm:px-3 ${showWorkspace ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-              onClick={() => setShowWorkspace(!showWorkspace)}
+              className={`h-7 gap-1.5 text-xs ${showWorkspace ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              onClick={toggleWorkspace}
             >
-              <Code2 className="size-3" />
-              <span className="hidden sm:inline">Workspace</span>
+              <Code2 className="size-3" />Workspace
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              className={`h-8 sm:h-7 gap-1 sm:gap-1.5 text-[11px] sm:text-xs px-2 sm:px-3 ${showTerminal ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-              onClick={() => setShowTerminal(!showTerminal)}
+              className={`h-7 gap-1.5 text-xs ${showTerminal ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              onClick={toggleTerminal}
             >
-              <Terminal className="size-3" />
-              <span className="hidden sm:inline">Terminal</span>
+              <Terminal className="size-3" />Terminal
             </Button>
           </div>
         </div>
 
-        {/* Content area with panels */}
+        {/* Main content area */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
-          {/* ===== Chat panel ===== */}
-          <div className={`flex flex-col min-w-0 ${
-            hasPanelOpen
-              ? 'hidden md:flex md:w-1/2 md:border-r md:border-border'
-              : 'flex-1'
+          {/* Chat panel */}
+          <div className={`flex flex-col min-w-0 overflow-hidden ${
+            hasSidePanel ? 'w-1/2 border-r border-border' : 'flex-1'
           }`}>
             {hasMessages ? (
               <ChatArea onRegenerate={() => {
@@ -131,84 +130,38 @@ export default function Home() {
             ) : (
               <EmptyState onSuggestionClick={handleNewChatAndSend} />
             )}
-            <InputArea
-              onSend={sendMessage}
-              onStop={stopStreaming}
-              isStreaming={isStreaming}
-            />
+            <InputArea onSend={sendMessage} onStop={stopStreaming} isStreaming={isStreaming} />
           </div>
 
-          {/* ===== Secondary panels ===== */}
-          {hasPanelOpen && (
-            <>
-              {/* --- Mobile: full-width panels --- */}
-              <div className="flex flex-1 md:hidden min-h-0 overflow-hidden">
-                {showWorkspace && !showTerminal && (
-                  <div className="flex w-full min-w-0">
-                    <div className="w-14 sm:w-40 shrink-0">
-                      <FileExplorer />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <CodeEditor />
-                    </div>
-                  </div>
-                )}
-                {showTerminal && !showWorkspace && (
-                  <div className="w-full min-w-0">
-                    <TerminalPanel />
-                  </div>
-                )}
-                {showWorkspace && showTerminal && (
-                  <div className="flex w-full min-w-0 flex-col">
-                    <div className="flex flex-1 min-h-0">
-                      <div className="w-14 sm:w-36 shrink-0">
-                        <FileExplorer />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <CodeEditor />
-                      </div>
-                    </div>
-                    <div className="h-36 shrink-0 border-t border-border">
-                      <TerminalPanel />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* --- Desktop: split panels --- */}
-              {showWorkspace && (
-                <div className="hidden md:flex md:w-1/2 min-w-0">
-                  <div className="w-48 shrink-0">
-                    <FileExplorer />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <CodeEditor />
-                  </div>
+          {/* Side panel area */}
+          {hasSidePanel && (
+            <div className="flex flex-col w-1/2 min-w-0 overflow-hidden">
+              {/* Workspace only */}
+              {showWorkspace && !showTerminal && (
+                <div className="flex flex-1 min-h-0 overflow-hidden">
+                  <div className="w-52 shrink-0 overflow-hidden"><FileExplorer /></div>
+                  <div className="flex-1 min-w-0 overflow-hidden"><CodeEditor /></div>
                 </div>
               )}
 
+              {/* Terminal only */}
               {showTerminal && !showWorkspace && (
-                <div className="hidden md:block md:w-1/2 min-w-0">
-                  <TerminalPanel />
-                </div>
+                <div className="flex-1 min-h-0 overflow-hidden"><TerminalPanel /></div>
               )}
 
+              {/* Both workspace and terminal */}
               {showWorkspace && showTerminal && (
-                <div className="hidden md:flex md:w-1/2 min-w-0 flex-col">
-                  <div className="flex flex-1 min-h-0">
-                    <div className="w-44 shrink-0">
-                      <FileExplorer />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <CodeEditor />
-                    </div>
+                <>
+                  <div className="flex flex-1 min-h-0 overflow-hidden">
+                    <div className="w-44 shrink-0 overflow-hidden"><FileExplorer /></div>
+                    <div className="flex-1 min-w-0 overflow-hidden"><CodeEditor /></div>
                   </div>
-                  <div className="h-48 shrink-0 border-t border-border">
+                  <div className="h-48 shrink-0 border-t border-white/[0.06] overflow-hidden">
                     <TerminalPanel />
                   </div>
-                </div>
+                </>
               )}
-            </>
+            </div>
           )}
         </div>
       </div>

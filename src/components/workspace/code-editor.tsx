@@ -1,0 +1,142 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useWorkspaceStore } from '@/stores/workspace-store';
+import { X, Save, FileCode } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+function getLanguageFromPath(path: string): string {
+  const ext = path.split('.').pop()?.toLowerCase() || '';
+  const map: Record<string, string> = {
+    ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript',
+    py: 'python', rs: 'rust', go: 'go', java: 'java', rb: 'ruby',
+    css: 'css', html: 'html', json: 'json', yaml: 'yaml', yml: 'yaml',
+    md: 'markdown', sql: 'sql', sh: 'bash', bash: 'bash',
+    c: 'c', cpp: 'cpp', h: 'c', hpp: 'cpp',
+    swift: 'swift', kt: 'kotlin', scala: 'scala', php: 'php',
+  };
+  return map[ext] || 'text';
+}
+
+export function CodeEditor() {
+  const { openFiles, activeFilePath, updateFileContent, closeFile, markFileSaved, setActiveFile } = useWorkspaceStore();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [saveStatus, setSaveStatus] = useState<string>('');
+
+  const activeFile = openFiles.find((f) => f.path === activeFilePath);
+
+  const handleSave = useCallback(async () => {
+    if (!activeFile) return;
+    try {
+      const res = await fetch('/api/workspace', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: activeFile.path, content: activeFile.content }),
+      });
+      if (res.ok) {
+        markFileSaved(activeFile.path);
+        setSaveStatus('Saved');
+        setTimeout(() => setSaveStatus(''), 2000);
+      }
+    } catch { /* */ }
+  }, [activeFile, markFileSaved]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleSave]);
+
+  if (openFiles.length === 0) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center bg-[#0a0a12] text-zinc-600">
+        <FileCode className="mb-3 size-12 opacity-30" />
+        <p className="text-sm">No file open</p>
+        <p className="mt-1 text-xs text-zinc-700">Click a file in the explorer or ask the AI to create one</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full flex-col bg-[#0a0a12]">
+      {/* Tab bar */}
+      <div className="flex items-center border-b border-white/[0.06] bg-[#0c0c14]">
+        <div className="flex flex-1 overflow-x-auto">
+          {openFiles.map((file) => (
+            <button
+              key={file.path}
+              onClick={() => setActiveFile(file.path)}
+              className={`group flex items-center gap-1.5 border-r border-white/[0.06] px-3 py-2 text-xs transition-colors ${
+                file.path === activeFilePath
+                  ? 'bg-[#0a0a12] text-zinc-200'
+                  : 'bg-[#0c0c14] text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              {file.modified && <span className="size-1.5 rounded-full bg-amber-400" />}
+              <span className="max-w-[120px] truncate">{file.path.split('/').pop()}</span>
+              <span
+                onClick={(e) => { e.stopPropagation(); closeFile(file.path); }}
+                className="ml-1 rounded p-0.5 opacity-0 transition-opacity hover:bg-white/[0.08] group-hover:opacity-100"
+              >
+                <X className="size-3" />
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1 px-2">
+          {saveStatus && <span className="text-[11px] text-emerald-400">{saveStatus}</span>}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 text-zinc-500 hover:text-zinc-300"
+            onClick={handleSave}
+            disabled={!activeFile?.modified}
+            title="Save (Ctrl+S)"
+          >
+            <Save className="size-3" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Path bar */}
+      {activeFile && (
+        <div className="flex items-center gap-2 border-b border-white/[0.06] px-3 py-1">
+          <span className="text-[10px] text-zinc-600">{activeFile.path}</span>
+          <span className="rounded bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-violet-400">
+            {getLanguageFromPath(activeFile.path)}
+          </span>
+          {activeFile.modified && (
+            <span className="text-[10px] text-amber-400">Modified</span>
+          )}
+        </div>
+      )}
+
+      {/* Editor area */}
+      {activeFile && (
+        <div className="relative flex-1">
+          <div className="absolute inset-0 flex">
+            {/* Line numbers */}
+            <div className="w-12 select-none overflow-hidden border-r border-white/[0.04] bg-[#0c0c14] py-3 text-right font-mono text-[11px] leading-[1.6] text-zinc-700">
+              {activeFile.content.split('\n').map((_, i) => (
+                <div key={i} className="pr-3">{i + 1}</div>
+              ))}
+            </div>
+            {/* Textarea */}
+            <textarea
+              ref={textareaRef}
+              value={activeFile.content}
+              onChange={(e) => updateFileContent(activeFile.path, e.target.value)}
+              className="flex-1 resize-none bg-transparent p-3 font-mono text-[13px] leading-[1.6] text-zinc-200 outline-none"
+              spellCheck={false}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

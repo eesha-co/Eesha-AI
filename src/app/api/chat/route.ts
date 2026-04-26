@@ -1,38 +1,183 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
+import { promises as fs } from 'fs';
+import path from 'path';
+import { exec } from 'child_process';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 
-const SYSTEM_PROMPT = `You are Kimi K2.5, an advanced AI coding assistant built by Moonshot AI. You are an expert in software engineering across all programming languages and frameworks.
+const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || '/home/z/my-project/workspace';
 
-Your capabilities include:
-- Writing, reviewing, and debugging code in any language
-- Explaining complex programming concepts clearly
-- Suggesting best practices, design patterns, and architectural decisions
-- Analyzing code for performance, security, and maintainability
-- Generating complete applications, APIs, and systems
-- Helping with DevOps, databases, cloud infrastructure, and more
+function safePath(relativePath: string): string {
+  const resolved = path.resolve(WORKSPACE_ROOT, relativePath);
+  if (!resolved.startsWith(WORKSPACE_ROOT)) {
+    throw new Error('Path traversal detected');
+  }
+  return resolved;
+}
 
-When writing code:
-- Always use proper syntax highlighting and code blocks with language identifiers
-- Include comments for complex logic
-- Follow language-specific conventions and best practices
-- Provide complete, runnable code when possible
-- Suggest tests when appropriate
+function runCommand(command: string, cwd?: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  const workingDir = cwd ? path.resolve(WORKSPACE_ROOT, cwd) : WORKSPACE_ROOT;
+  const safeDir = workingDir.startsWith(WORKSPACE_ROOT) ? workingDir : WORKSPACE_ROOT;
 
-When explaining:
-- Be thorough but concise
-- Use examples to illustrate concepts
-- Break complex topics into digestible parts
-- Reference relevant documentation or standards when helpful
+  return new Promise((resolve) => {
+    exec(command, {
+      cwd: safeDir,
+      timeout: 15000,
+      maxBuffer: 1024 * 1024,
+      env: { ...process.env, TERM: 'dumb' },
+    }, (error, stdout, stderr) => {
+      resolve({
+        stdout: stdout || '',
+        stderr: stderr || '',
+        exitCode: error ? error.code || 1 : 0,
+      });
+    });
+  });
+}
 
-Be direct, accurate, and helpful. If you're unsure about something, say so rather than guessing.`;
-
-// NVIDIA API — OpenAI-compatible endpoint for Kimi K2.5
 const NVIDIA_BASE_URL = process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1';
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || '';
 const MODEL_ID = 'moonshotai/kimi-k2.5';
+
+const TOOLS_PROMPT = `You have access to the following tools. Use them by outputting a JSON block inside \`\`\`tool\`\`\` code fences.
+
+## Available Tools
+
+### create_file
+Create or overwrite a file in the workspace.
+\`\`\`tool
+{"tool": "create_file", "path": "relative/path/to/file.py", "content": "file contents here"}
+\`\`\`
+
+### edit_file
+Edit a specific part of a file by replacing old text with new text.
+\`\`\`tool
+{"tool": "edit_file", "path": "relative/path/to/file.py", "old": "text to find", "new": "replacement text"}
+\`\`\`
+
+### run_command
+Run a terminal command in the workspace directory.
+\`\`\`tool
+{"tool": "run_command", "command": "npm install express", "cwd": ""}
+\`\`\`
+
+### read_file
+Read a file's contents from the workspace.
+\`\`\`tool
+{"tool": "read_file", "path": "relative/path/to/file.py"}
+\`\`\`
+
+### list_dir
+List contents of a directory in the workspace.
+\`\`\`tool
+{"tool": "list_dir", "path": "src/components"}
+\`\`\`
+
+## Rules
+- ALWAYS use tools when you need to create, edit, or read files, or run commands.
+- When asked to build something, create the actual files using create_file.
+- After creating files, use run_command to install dependencies and test if needed.
+- You can use multiple tool calls in one response.
+- After using tools, briefly explain what you did.
+- Paths are relative to the workspace root.`;
+
+const SYSTEM_PROMPT = `You are Kimi K2.5, an advanced AI coding agent built by Moonshot AI. You are an expert in software engineering across all programming languages and frameworks.
+
+${TOOLS_PROMPT}
+
+You are a CODING AGENT, not just a chatbot. When users ask you to build something, you should:
+1. Plan your approach
+2. Create the actual files using create_file
+3. Install dependencies using run_command
+4. Run and test the code using run_command
+5. Iterate if there are errors
+
+Be proactive — if someone asks you to build an API, create the files and run them. Don't just describe what to do — DO it.`;
+
+// Parse tool calls from AI response text
+// Kimi K2.5 uses native tool calling format: <|tool_calls_section_begin|> <|tool_call_begin|> functions.create_file:0 <|tool_call_argument_begin|> {"path":"..."} <|tool_call_end|>
+function parseToolCalls(text: string): { toolCalls: any[]; cleanText: string } {
+  const toolCalls: any[] = [];
+  let cleanText = text;
+
+  // Format 1: ```tool JSON blocks
+  const regex1 = /```tool\s*\n([\s\S]*?)\n```/g;
+  let match;
+  while ((match = regex1.exec(text)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1].trim());
+      toolCalls.push(parsed);
+      cleanText = cleanText.replace(match[0], '');
+    } catch { /* skip */ }
+  }
+
+  // Format 2: Kimi native format <|tool_call_begin|> functions.tool_name:index <|tool_call_argument_begin|> JSON <|tool_call_end|>
+  const regex2 = /<\|tool_call_begin\|>\s*functions\.(\w+):\d+\s*<\|tool_call_argument_begin\|>\s*([\s\S]*?)<\|tool_call_end\|>/g;
+  while ((match = regex2.exec(text)) !== null) {
+    try {
+      const toolName = match[1];
+      const args = JSON.parse(match[2].trim());
+      toolCalls.push({ tool: toolName, ...args });
+      cleanText = cleanText.replace(match[0], '');
+    } catch { /* skip */ }
+  }
+
+  // Clean up any remaining tool markers
+  cleanText = cleanText
+    .replace(/<\|tool_calls_section_begin\|>/g, '')
+    .replace(/<\|tool_call_begin\|>[\s\S]*?<\|tool_call_end\|>/g, '')
+    .replace(/<\|tool_call_argument_begin\|>/g, '')
+    .replace(/<\|tool_call_end\|>/g, '')
+    .trim();
+
+  return { toolCalls, cleanText };
+}
+
+// Execute a single tool call
+async function executeTool(toolCall: any): Promise<string> {
+  try {
+    switch (toolCall.tool) {
+      case 'create_file': {
+        const fullPath = safePath(toolCall.path);
+        await fs.mkdir(path.dirname(fullPath), { recursive: true });
+        await fs.writeFile(fullPath, toolCall.content || '', 'utf-8');
+        return `✅ File created: ${toolCall.path}`;
+      }
+      case 'edit_file': {
+        const fullPath = safePath(toolCall.path);
+        let content = await fs.readFile(fullPath, 'utf-8');
+        content = content.replace(toolCall.old, toolCall.new);
+        await fs.writeFile(fullPath, content, 'utf-8');
+        return `✅ File edited: ${toolCall.path}`;
+      }
+      case 'run_command': {
+        const result = await runCommand(toolCall.command, toolCall.cwd);
+        const output = [];
+        if (result.stdout) output.push(result.stdout);
+        if (result.stderr) output.push(`STDERR: ${result.stderr}`);
+        output.push(`Exit code: ${result.exitCode}`);
+        return `🖥️ Command: \`${toolCall.command}\`\n${output.join('\n')}`;
+      }
+      case 'read_file': {
+        const fullPath = safePath(toolCall.path);
+        const content = await fs.readFile(fullPath, 'utf-8');
+        return `📄 ${toolCall.path}:\n\`\`\`\n${content}\n\`\`\``;
+      }
+      case 'list_dir': {
+        const dirPath = safePath(toolCall.path || '');
+        const entries = await fs.readdir(dirPath, { withFileTypes: true });
+        const listing = entries.map(e => `${e.isDirectory() ? '📁' : '📄'} ${e.name}`).join('\n');
+        return `📂 ${toolCall.path || '/'}:\n${listing || '(empty)'}`;
+      }
+      default:
+        return `❌ Unknown tool: ${toolCall.tool}`;
+    }
+  } catch (error) {
+    return `❌ Error executing ${toolCall.tool}: ${String(error)}`;
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,12 +192,12 @@ export async function POST(req: NextRequest) {
 
     if (!NVIDIA_API_KEY) {
       return new Response(
-        JSON.stringify({ error: 'NVIDIA_API_KEY not configured. Set it in your .env file.' }),
+        JSON.stringify({ error: 'NVIDIA_API_KEY not configured.' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    // Save user message to database
+    // Save user message
     const lastMessage = messages[messages.length - 1];
     if (lastMessage.role === 'user' && conversationId) {
       await db.message.create({
@@ -60,7 +205,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Auto-generate title from first user message
+    // Auto-generate title
     if (conversationId && messages.length === 1) {
       const title = lastMessage.content.slice(0, 60) + (lastMessage.content.length > 60 ? '...' : '');
       await db.conversation.update({
@@ -69,100 +214,129 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Prepare messages for NVIDIA's OpenAI-compatible API
+    // Build message list for NVIDIA API
     const aiMessages = [
       { role: 'system' as const, content: SYSTEM_PROMPT },
       ...messages.map((m: { role: string; content: string }) => ({
-        role: m.role as 'user' | 'assistant' | 'system',
+        role: m.role as 'user' | 'assistant',
         content: m.content,
       })),
     ];
 
-    // Call NVIDIA API — OpenAI-compatible streaming endpoint with thinking mode
-    const nvidiaResponse = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${NVIDIA_API_KEY}`,
-        'Accept': 'text/event-stream',
-      },
-      body: JSON.stringify({
-        model: MODEL_ID,
-        messages: aiMessages,
-        stream: true,
-        temperature: 1.0,
-        top_p: 1.0,
-        max_tokens: 16384,
-        chat_template_kwargs: { thinking: true },
-      }),
-    });
-
-    if (!nvidiaResponse.ok) {
-      const errorText = await nvidiaResponse.text();
-      console.error(`NVIDIA API error ${nvidiaResponse.status}:`, errorText);
-      return new Response(
-        JSON.stringify({ error: `NVIDIA API error: ${nvidiaResponse.status} - ${errorText.slice(0, 200)}` }),
-        { status: nvidiaResponse.status, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Process the OpenAI-compatible streaming response from NVIDIA
-    // With thinking mode, the response can have both `reasoning_content` and `content` in delta
     const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
     let fullResponse = '';
-    let fullThinking = '';
 
     const readableStream = new ReadableStream({
       async start(controller) {
         try {
-          const reader = nvidiaResponse.body?.getReader();
-          if (!reader) throw new Error('No response body from NVIDIA');
+          // Agent loop: call AI, execute tools, repeat if needed
+          const MAX_ITERATIONS = 5;
 
-          let buffer = '';
+          for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+            // Call NVIDIA API
+            const nvidiaResponse = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${NVIDIA_API_KEY}`,
+                'Accept': 'text/event-stream',
+              },
+              body: JSON.stringify({
+                model: MODEL_ID,
+                messages: aiMessages,
+                stream: true,
+                temperature: 0.6,
+                top_p: 0.7,
+                max_tokens: 16384,
+              }),
+            });
 
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+            if (!nvidiaResponse.ok) {
+              const errorText = await nvidiaResponse.text();
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', content: `NVIDIA API error: ${nvidiaResponse.status}` })}\n\n`));
+              break;
+            }
 
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
+            // Stream response
+            const reader = nvidiaResponse.body?.getReader();
+            if (!reader) break;
 
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed || !trimmed.startsWith('data: ')) continue;
+            const decoder = new TextDecoder();
+            let iterationResponse = '';
+            let buffer = '';
 
-              const data = trimmed.slice(6);
-              if (data === '[DONE]') continue;
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
 
-              try {
-                const parsed = JSON.parse(data);
-                const delta = parsed.choices?.[0]?.delta;
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
 
-                if (delta) {
-                  // Handle thinking/reasoning content
-                  const reasoningContent = delta.reasoning_content;
-                  const content = delta.content;
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed || !trimmed.startsWith('data: ')) continue;
 
-                  if (reasoningContent) {
-                    fullThinking += reasoningContent;
-                    controller.enqueue(
-                      encoder.encode(`data: ${JSON.stringify({ type: 'thinking', content: reasoningContent })}\n\n`)
-                    );
-                  }
+                const data = trimmed.slice(6);
+                if (data === '[DONE]') continue;
+
+                try {
+                  const parsed = JSON.parse(data);
+                  const content = parsed.choices?.[0]?.delta?.content;
 
                   if (content) {
+                    iterationResponse += content;
                     fullResponse += content;
-                    controller.enqueue(
-                      encoder.encode(`data: ${JSON.stringify({ type: 'content', content })}\n\n`)
-                    );
+
+                    // Filter out Kimi's native tool call markers from user-visible stream
+                    const filteredContent = content
+                      .replace(/<\|tool_calls_section_begin\|>/g, '')
+                      .replace(/<\|tool_call_begin\|>/g, '')
+                      .replace(/<\|tool_call_argument_begin\|>/g, '')
+                      .replace(/<\|tool_call_end\|>/g, '');
+
+                    if (filteredContent.trim()) {
+                      controller.enqueue(
+                        encoder.encode(`data: ${JSON.stringify({ type: 'content', content: filteredContent })}\n\n`)
+                      );
+                    }
                   }
-                }
-              } catch {
-                // Skip malformed JSON
+                } catch { /* skip */ }
               }
             }
+
+            // Check for tool calls in the response
+            const { toolCalls, cleanText } = parseToolCalls(iterationResponse);
+
+            if (toolCalls.length === 0) {
+              // No tools to execute — we're done
+              break;
+            }
+
+            // Execute tools and send results
+            const toolResults: string[] = [];
+            for (const toolCall of toolCalls) {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ type: 'tool_start', tool: toolCall.tool, path: toolCall.path || '', command: toolCall.command || '' })}\n\n`)
+              );
+
+              const result = await executeTool(toolCall);
+              toolResults.push(result);
+
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ type: 'tool_result', result })}\n\n`)
+              );
+            }
+
+            // Add assistant response and tool results to message history for next iteration
+            aiMessages.push({ role: 'assistant', content: iterationResponse });
+            aiMessages.push({
+              role: 'user',
+              content: `Tool execution results:\n\n${toolResults.join('\n\n---\n\n')}\n\nContinue based on these results. If everything is working, summarize what you did. If there are errors, fix them.`,
+            });
+
+            // Also update fullResponse with tool results for the client
+            fullResponse += `\n\n${toolResults.join('\n\n')}`;
           }
 
           // Save assistant response to database

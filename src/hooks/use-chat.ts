@@ -2,18 +2,19 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { useChatStore } from '@/stores/chat-store';
+import { useWorkspaceStore } from '@/stores/workspace-store';
 
 export function useChat() {
   const {
     addConversation,
     addMessage,
     updateLastAssistantMessage,
-    appendThinking,
-    setThinkingDone,
     setIsStreaming,
     activeConversationId,
     updateConversationTitle,
   } = useChatStore();
+
+  const refreshFiles = useWorkspaceStore((s) => s.refreshFiles);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -53,8 +54,6 @@ export function useChat() {
         id: `assistant-${Date.now()}`,
         role: 'assistant' as const,
         content: '',
-        thinking: '',
-        isThinking: false,
         createdAt: new Date().toISOString(),
       };
       addMessage(conversationId, assistantMessage);
@@ -91,7 +90,7 @@ export function useChat() {
 
         const decoder = new TextDecoder();
         let fullContent = '';
-        let fullThinking = '';
+        let toolExecuted = false;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -107,23 +106,37 @@ export function useChat() {
               try {
                 const parsed = JSON.parse(data);
 
-                if (parsed.type === 'thinking' && parsed.content) {
-                  fullThinking += parsed.content;
-                  appendThinking(conversationId, parsed.content);
+                if (parsed.type === 'content' && parsed.content) {
+                  fullContent += parsed.content;
+                  updateLastAssistantMessage(conversationId, fullContent);
                 }
 
-                if (parsed.type === 'content' && parsed.content) {
-                  // Mark thinking as done when we start receiving content
-                  if (fullThinking) {
-                    setThinkingDone(conversationId);
-                  }
-                  fullContent += parsed.content;
+                if (parsed.type === 'tool_start') {
+                  toolExecuted = true;
+                  // Add tool indicator to the response
+                  const toolLabel = parsed.tool === 'create_file'
+                    ? `📄 Creating ${parsed.path}...`
+                    : parsed.tool === 'edit_file'
+                    ? `✏️ Editing ${parsed.path}...`
+                    : parsed.tool === 'run_command'
+                    ? `🖥️ Running: ${parsed.command}...`
+                    : parsed.tool === 'read_file'
+                    ? `📖 Reading ${parsed.path}...`
+                    : parsed.tool === 'list_dir'
+                    ? `📂 Listing ${parsed.path || '/'}...`
+                    : `🔧 ${parsed.tool}...`;
+
+                  fullContent += `\n\n${toolLabel}\n`;
+                  updateLastAssistantMessage(conversationId, fullContent);
+                }
+
+                if (parsed.type === 'tool_result' && parsed.result) {
+                  fullContent += `${parsed.result}\n`;
                   updateLastAssistantMessage(conversationId, fullContent);
                 }
 
                 if (parsed.type === 'error') setError(parsed.content);
                 if (!parsed.type && parsed.content) {
-                  // Fallback for old format
                   fullContent += parsed.content;
                   updateLastAssistantMessage(conversationId, fullContent);
                 }
@@ -132,9 +145,9 @@ export function useChat() {
           }
         }
 
-        // Ensure thinking is marked as done
-        if (fullThinking) {
-          setThinkingDone(conversationId);
+        // Refresh workspace if tools were executed
+        if (toolExecuted) {
+          refreshFiles();
         }
 
         // Update title on first message
@@ -153,22 +166,20 @@ export function useChat() {
       } catch (err: unknown) {
         if (err instanceof Error && err.name === 'AbortError') {
           // cancelled
-          setThinkingDone(conversationId);
         } else {
           const msg = err instanceof Error ? err.message : 'Failed to get response';
           setError(msg);
           updateLastAssistantMessage(
             conversationId,
-            '⚠️ Unable to generate a response. Please check your NVIDIA API key and try again.'
+            '⚠️ Unable to generate a response. Please try again.'
           );
-          setThinkingDone(conversationId);
         }
       } finally {
         setIsStreaming(false);
         abortControllerRef.current = null;
       }
     },
-    [activeConversationId, addConversation, addMessage, updateLastAssistantMessage, appendThinking, setThinkingDone, setIsStreaming, updateConversationTitle]
+    [activeConversationId, addConversation, addMessage, updateLastAssistantMessage, setIsStreaming, updateConversationTitle, refreshFiles]
   );
 
   const stopStreaming = useCallback(() => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useChatStore } from '@/stores/chat-store';
 import { useChat } from '@/hooks/use-chat';
 import { Sidebar } from '@/components/chat/sidebar';
@@ -8,6 +8,13 @@ import { ChatArea } from '@/components/chat/chat-area';
 import { InputArea } from '@/components/chat/input-area';
 import { EmptyState } from '@/components/chat/empty-state';
 import { Header } from '@/components/chat/header';
+import { FileExplorer } from '@/components/workspace/file-explorer';
+import { CodeEditor } from '@/components/workspace/code-editor';
+import { TerminalPanel } from '@/components/workspace/terminal';
+import { Button } from '@/components/ui/button';
+import { Code2, Terminal, PanelRight, MessageSquare, LayoutDashboard } from 'lucide-react';
+
+type ActivePanel = 'chat' | 'workspace' | 'terminal';
 
 export default function Home() {
   const {
@@ -23,6 +30,10 @@ export default function Home() {
 
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
   const hasMessages = activeConversation && activeConversation.messages.length > 0;
+
+  const [activePanel, setActivePanel] = useState<ActivePanel>('chat');
+  const [showWorkspace, setShowWorkspace] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
 
   // Load conversations on mount
   useEffect(() => {
@@ -50,7 +61,6 @@ export default function Home() {
   const handleNewChatAndSend = useCallback(
     (content: string) => {
       setActiveConversation(null);
-      // Use setTimeout to allow state update before sending
       setTimeout(() => {
         sendMessage(content);
       }, 0);
@@ -65,27 +75,99 @@ export default function Home() {
 
       {/* Main content */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Header */}
-        <Header />
+        {/* Top bar with panel toggles */}
+        <div className="flex h-11 items-center justify-between border-b border-white/[0.06] bg-[#0a0a12]/80 px-3 backdrop-blur-xl">
+          <Header />
 
-        {/* Chat or Empty State */}
-        {hasMessages ? (
-          <ChatArea onRegenerate={() => {
-            if (activeConversation) {
-              const lastUserMsg = [...activeConversation.messages].reverse().find((m) => m.role === 'user');
-              if (lastUserMsg) sendMessage(lastUserMsg.content);
-            }
-          }} />
-        ) : (
-          <EmptyState onSuggestionClick={handleNewChatAndSend} />
-        )}
+          {/* Panel toggle buttons */}
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-7 gap-1.5 text-xs ${activePanel === 'chat' ? 'bg-white/[0.06] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+              onClick={() => { setActivePanel('chat'); setShowWorkspace(false); setShowTerminal(false); }}
+            >
+              <MessageSquare className="size-3" />
+              Chat
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-7 gap-1.5 text-xs ${showWorkspace ? 'bg-white/[0.06] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+              onClick={() => setShowWorkspace(!showWorkspace)}
+            >
+              <Code2 className="size-3" />
+              Workspace
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-7 gap-1.5 text-xs ${showTerminal ? 'bg-white/[0.06] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+              onClick={() => setShowTerminal(!showTerminal)}
+            >
+              <Terminal className="size-3" />
+              Terminal
+            </Button>
+          </div>
+        </div>
 
-        {/* Input */}
-        <InputArea
-          onSend={sendMessage}
-          onStop={stopStreaming}
-          isStreaming={isStreaming}
-        />
+        {/* Content area with panels */}
+        <div className="flex flex-1 min-h-0">
+          {/* Chat panel */}
+          <div className={`flex flex-col ${showWorkspace || showTerminal ? 'w-1/2 border-r border-white/[0.06]' : 'flex-1'}`}>
+            {hasMessages ? (
+              <ChatArea onRegenerate={() => {
+                if (activeConversation) {
+                  const lastUserMsg = [...activeConversation.messages].reverse().find((m) => m.role === 'user');
+                  if (lastUserMsg) sendMessage(lastUserMsg.content);
+                }
+              }} />
+            ) : (
+              <EmptyState onSuggestionClick={handleNewChatAndSend} />
+            )}
+            <InputArea
+              onSend={sendMessage}
+              onStop={stopStreaming}
+              isStreaming={isStreaming}
+            />
+          </div>
+
+          {/* Workspace panel */}
+          {showWorkspace && (
+            <div className="flex w-1/2 min-w-0">
+              <div className="w-48 shrink-0">
+                <FileExplorer />
+              </div>
+              <div className="flex-1 min-w-0">
+                <CodeEditor />
+              </div>
+            </div>
+          )}
+
+          {/* Terminal panel */}
+          {showTerminal && !showWorkspace && (
+            <div className="w-1/2 min-w-0">
+              <TerminalPanel />
+            </div>
+          )}
+
+          {/* Both workspace and terminal */}
+          {showWorkspace && showTerminal && (
+            <div className="flex w-1/2 min-w-0 flex-col">
+              <div className="flex flex-1 min-h-0">
+                <div className="w-44 shrink-0">
+                  <FileExplorer />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <CodeEditor />
+                </div>
+              </div>
+              <div className="h-48 shrink-0 border-t border-white/[0.06]">
+                <TerminalPanel />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

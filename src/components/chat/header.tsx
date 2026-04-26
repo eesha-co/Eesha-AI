@@ -24,7 +24,7 @@ export function Header() {
             <PanelLeft className="size-4" />
           </Button>
           <div className="flex items-center gap-2">
-            <img src="/logo.svg" alt="Eesha AI" className="size-6" />
+            <img src="/logo.png" alt="Eesha AI" className="size-6" />
             <span className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-sm font-semibold text-transparent">
               Eesha AI
             </span>

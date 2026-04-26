@@ -49,6 +49,9 @@ RUN mkdir -p /app/workspace /app/data
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
+
+# Download logo from GitHub during build
+RUN curl -L -o /app/public/logo.png "https://raw.githubusercontent.com/eesha000009-dev/Eesha-AI/main/ChatGPT%20Image%20Apr%2026%2C%202026%2C%2012_02_40%20PM.png" || echo "Logo download failed, using fallback"
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma

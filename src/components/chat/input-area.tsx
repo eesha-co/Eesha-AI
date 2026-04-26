@@ -66,7 +66,7 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask Kimi K2.5 to write, debug, or explain code..."
+              placeholder="Ask Eesha AI to write, debug, or explain code..."
               rows={1}
               className="max-h-[200px] min-h-[28px] flex-1 resize-none bg-transparent text-sm leading-relaxed text-zinc-200 placeholder-zinc-600 outline-none"
             />
@@ -117,7 +117,7 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
         <div className="mt-2 flex items-center justify-between px-1">
           <div className="flex items-center gap-1.5">
             <Sparkles className="size-3 text-violet-500/50" />
-            <span className="text-[11px] text-zinc-600">Kimi K2.5 with Thinking Mode</span>
+            <span className="text-[11px] text-zinc-600">Eesha AI with Thinking Mode</span>
           </div>
           <span className="text-[11px] text-zinc-600">
             AI can make mistakes. Review code carefully.

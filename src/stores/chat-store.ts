@@ -4,7 +4,7 @@ export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  thinking?: string; // Chain-of-thought reasoning from Kimi K2.5
+  thinking?: string; // Chain-of-thought reasoning
   isThinking?: boolean; // Currently receiving thinking content
   createdAt?: string;
 }

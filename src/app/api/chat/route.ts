@@ -83,7 +83,7 @@ List contents of a directory in the workspace.
 - After using tools, briefly explain what you did.
 - Paths are relative to the workspace root.`;
 
-const SYSTEM_PROMPT = `You are Eesha AI, an advanced AI coding agent powered by Kimi K2.5. You are an expert in software engineering across all programming languages and frameworks.
+const SYSTEM_PROMPT = `You are Eesha AI, an advanced AI coding agent. You are an expert in software engineering across all programming languages and frameworks.
 
 ${TOOLS_PROMPT}
 

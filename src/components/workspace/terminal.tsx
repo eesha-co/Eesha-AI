@@ -12,7 +12,7 @@ interface TerminalLine {
 
 export function TerminalPanel() {
   const [lines, setLines] = useState<TerminalLine[]>([
-    { type: 'output', content: 'Kimi K2.5 Workspace Terminal' },
+    { type: 'output', content: 'Eesha AI Workspace Terminal' },
     { type: 'output', content: 'Type commands below. Working directory: /workspace' },
     { type: 'output', content: '' },
   ]);

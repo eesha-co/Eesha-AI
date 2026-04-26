@@ -67,3 +67,6 @@ bun.lock
 # Large binary files
 *.bin
 *.exe
+
+# Logo PNG (downloaded during Docker build, not committed)
+public/logo.png

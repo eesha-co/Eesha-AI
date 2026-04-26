@@ -14,12 +14,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Eesha AI - AI Coding Platform",
-  description: "Advanced AI coding platform powered by Kimi K2.5. Write, debug, and deploy code with an intelligent coding agent.",
-  keywords: ["Eesha AI", "Kimi K2.5", "AI", "coding assistant", "code generation", "coding agent"],
+  title: "Eesha AI",
+  description: "Advanced AI coding platform. Write, debug, and deploy code with Eesha AI.",
+  keywords: ["Eesha AI", "AI", "coding assistant", "code generation", "coding agent"],
   authors: [{ name: "Eesha AI" }],
   icons: {
-    icon: "/favicon.svg",
+    icon: ["/favicon.svg", "/logo.png"],
   },
 };
 

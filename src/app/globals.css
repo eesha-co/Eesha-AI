@@ -242,6 +242,11 @@
   50% { opacity: 0.9; transform: scale(1.05); }
 }
 
+@keyframes light-sweep {
+  0% { transform: translateX(100vw); }
+  100% { transform: translateX(-100vw); }
+}
+
 /* ===== Animation utility classes ===== */
 .animate-blink-cursor {
   animation: blink-cursor 1s step-end infinite;
@@ -278,6 +283,10 @@
 
 .animate-breathe-slow {
   animation: breathe-slow 8s ease-in-out infinite;
+}
+
+.animate-light-sweep {
+  animation: light-sweep 12s ease-in-out infinite;
 }
 
 /* ===== Prose-chat styling — theme-aware ===== */

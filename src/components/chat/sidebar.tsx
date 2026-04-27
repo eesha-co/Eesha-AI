@@ -130,9 +130,8 @@ export function Sidebar() {
           {/* Header with branding */}
           <div className="flex items-center justify-between px-4 py-4">
             <div className="flex items-center gap-2.5">
-              <div className="relative flex size-8 items-center justify-center rounded-lg overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-cyan-500/10" />
-                <img src="/logo-transparent.png" alt="Eesha AI" className="relative size-6 object-contain" />
+              <div className="flex size-7 items-center justify-center rounded-md overflow-hidden">
+                <img src="/logo-transparent.png" alt="Eesha AI" className="size-5 object-contain" />
               </div>
               <div>
                 <span className="block text-sm font-bold text-foreground">Eesha AI</span>

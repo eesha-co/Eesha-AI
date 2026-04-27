@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Copy, Check, RefreshCw, Brain, ChevronDown, ChevronRight } from 'lucide-react';
+import { Copy, Check, RefreshCw, Brain, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CodeBlock } from '@/components/chat/code-block';
 import type { Message as MessageType } from '@/stores/chat-store';
@@ -131,9 +131,9 @@ export function Message({ message, isStreaming, onRegenerate }: MessageProps) {
       transition={{ duration: 0.25, ease: 'easeOut' }}
       className="group flex gap-3"
     >
-      {/* Avatar with transparent logo */}
-      <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl border border-border bg-gradient-to-br from-violet-600/20 to-cyan-600/20 overflow-hidden">
-        <img src="/logo-transparent.png" alt="Eesha" className="size-5 object-contain" />
+      {/* Avatar — small sparkles icon */}
+      <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl border border-border bg-gradient-to-br from-violet-600/20 to-cyan-600/20">
+        <Sparkles className="size-4 text-primary" />
       </div>
 
       {/* Content */}

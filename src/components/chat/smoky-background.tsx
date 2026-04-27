@@ -1,130 +1,218 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { useChatStore } from '@/stores/chat-store';
 
 export function SmokyBackground() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const { themeMode } = useChatStore();
 
-  // Determine if dark mode is active
-  const isDark = typeof window !== 'undefined'
-    ? document.documentElement.classList.contains('dark')
-    : true;
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animId: number;
+    let time = 0;
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Smoke particles
+    const particles: {
+      x: number; y: number; vx: number; vy: number;
+      radius: number; opacity: number; hue: number;
+      life: number; maxLife: number;
+    }[] = [];
+
+    const createParticle = () => {
+      const w = canvas.width;
+      const h = canvas.height;
+      return {
+        x: Math.random() * w,
+        y: Math.random() * h,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.2 - 0.1,
+        radius: Math.random() * 200 + 100,
+        opacity: Math.random() * 0.03 + 0.01,
+        hue: Math.random() > 0.5 ? 220 + Math.random() * 30 : 260 + Math.random() * 20,
+        life: 0,
+        maxLife: Math.random() * 600 + 400,
+      };
+    };
+
+    for (let i = 0; i < 12; i++) {
+      const p = createParticle();
+      p.life = Math.random() * p.maxLife;
+      particles.push(p);
+    }
+
+    const draw = () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      const w = canvas.width;
+      const h = canvas.height;
+      time += 0.005;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // ─── Smoke particles ───
+      for (const p of particles) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life++;
+
+        if (p.life > p.maxLife || p.x < -300 || p.x > w + 300 || p.y < -300 || p.y > h + 300) {
+          Object.assign(p, createParticle());
+        }
+
+        const lifeRatio = p.life / p.maxLife;
+        const fade = lifeRatio < 0.1 ? lifeRatio / 0.1
+                   : lifeRatio > 0.8 ? (1 - lifeRatio) / 0.2
+                   : 1;
+
+        const alpha = p.opacity * fade * (isDark ? 1.5 : 0.5);
+        const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius);
+        grad.addColorStop(0, `hsla(${p.hue}, 60%, ${isDark ? 60 : 50}%, ${alpha})`);
+        grad.addColorStop(0.5, `hsla(${p.hue}, 50%, ${isDark ? 40 : 40}%, ${alpha * 0.4})`);
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.fillRect(p.x - p.radius, p.y - p.radius, p.radius * 2, p.radius * 2);
+      }
+
+      // ─── Diagonal light sweep — animated, moves right to left ───
+      const sweepX = w * (1.2 - (time * 0.15) % 2.4);
+      const sweepGrad = ctx.createLinearGradient(sweepX - w * 0.3, 0, sweepX + w * 0.1, h);
+      if (isDark) {
+        sweepGrad.addColorStop(0, 'transparent');
+        sweepGrad.addColorStop(0.3, `rgba(160, 200, 255, ${0.03 + Math.sin(time * 2) * 0.01})`);
+        sweepGrad.addColorStop(0.5, `rgba(130, 180, 255, ${0.05 + Math.sin(time * 2) * 0.02})`);
+        sweepGrad.addColorStop(0.7, `rgba(160, 200, 255, ${0.03 + Math.sin(time * 2) * 0.01})`);
+        sweepGrad.addColorStop(1, 'transparent');
+      } else {
+        sweepGrad.addColorStop(0, 'transparent');
+        sweepGrad.addColorStop(0.3, `rgba(139, 92, 246, ${0.015 + Math.sin(time * 2) * 0.005})`);
+        sweepGrad.addColorStop(0.5, `rgba(124, 58, 237, ${0.025 + Math.sin(time * 2) * 0.008})`);
+        sweepGrad.addColorStop(0.7, `rgba(6, 182, 212, ${0.015 + Math.sin(time * 2) * 0.005})`);
+        sweepGrad.addColorStop(1, 'transparent');
+      }
+      ctx.fillStyle = sweepGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // ─── Top-right ambient glow (breathing) ───
+      const breathe1 = 0.7 + Math.sin(time * 1.05) * 0.3;
+      const trGrad = ctx.createRadialGradient(w * 0.8, h * 0.1, 0, w * 0.8, h * 0.1, w * 0.5);
+      if (isDark) {
+        trGrad.addColorStop(0, `rgba(160, 195, 255, ${0.1 * breathe1})`);
+        trGrad.addColorStop(0.4, `rgba(120, 165, 255, ${0.05 * breathe1})`);
+        trGrad.addColorStop(1, 'transparent');
+      } else {
+        trGrad.addColorStop(0, `rgba(139, 92, 246, ${0.05 * breathe1})`);
+        trGrad.addColorStop(0.4, `rgba(124, 58, 237, ${0.02 * breathe1})`);
+        trGrad.addColorStop(1, 'transparent');
+      }
+      ctx.fillStyle = trGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // ─── Bottom-left ambient glow ───
+      const breathe2 = 0.6 + Math.sin(time * 0.8 + 1) * 0.4;
+      const blGrad = ctx.createRadialGradient(w * 0.15, h * 0.85, 0, w * 0.15, h * 0.85, w * 0.4);
+      if (isDark) {
+        blGrad.addColorStop(0, `rgba(139, 92, 246, ${0.06 * breathe2})`);
+        blGrad.addColorStop(0.5, `rgba(100, 80, 200, ${0.03 * breathe2})`);
+        blGrad.addColorStop(1, 'transparent');
+      } else {
+        blGrad.addColorStop(0, `rgba(139, 92, 246, ${0.03 * breathe2})`);
+        blGrad.addColorStop(0.5, `rgba(6, 182, 212, ${0.015 * breathe2})`);
+        blGrad.addColorStop(1, 'transparent');
+      }
+      ctx.fillStyle = blGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // ─── Centered rotating glow ring (dark mode only) ───
+      if (isDark) {
+        const cx = w / 2;
+        const cy = h / 2;
+        const ringRadius = Math.min(w, h) * 0.28;
+        const rotationSpeed = time * 0.25;
+
+        // 4 glow spots orbiting the center
+        const spots = [
+          { angle: rotationSpeed, size: 0.55, alpha: 0.14, hue: 220 },
+          { angle: rotationSpeed + Math.PI * 0.5, size: 0.45, alpha: 0.11, hue: 240 },
+          { angle: rotationSpeed + Math.PI, size: 0.5, alpha: 0.12, hue: 260 },
+          { angle: rotationSpeed + Math.PI * 1.5, size: 0.48, alpha: 0.13, hue: 230 },
+        ];
+
+        for (const spot of spots) {
+          const sx = cx + Math.cos(spot.angle) * ringRadius;
+          const sy = cy + Math.sin(spot.angle) * ringRadius;
+          const spotR = ringRadius * spot.size;
+
+          const spotGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, spotR);
+          spotGrad.addColorStop(0, `hsla(${spot.hue}, 70%, 70%, ${spot.alpha})`);
+          spotGrad.addColorStop(0.4, `hsla(${spot.hue}, 60%, 50%, ${spot.alpha * 0.4})`);
+          spotGrad.addColorStop(1, 'transparent');
+          ctx.fillStyle = spotGrad;
+          ctx.fillRect(sx - spotR, sy - spotR, spotR * 2, spotR * 2);
+        }
+
+        // Semi-transparent logo watermark in center
+        const logoSize = Math.min(w, h) * 0.45;
+        const logoX = cx - logoSize / 2;
+        const logoY = cy - logoSize / 2;
+
+        ctx.save();
+        ctx.globalAlpha = 0.06 + Math.sin(time * 0.5) * 0.01;
+        ctx.filter = 'brightness(1.3) saturate(1.2)';
+
+        const logo = new Image();
+        logo.src = '/logo-transparent.png';
+        if (logo.complete) {
+          ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+        }
+        ctx.restore();
+      }
+
+      // ─── Light mode: subtle center glow only ───
+      if (!isDark) {
+        const cx = w / 2;
+        const cy = h / 2;
+        const breathe3 = 0.7 + Math.sin(time * 0.6) * 0.3;
+        const centerR = Math.min(w, h) * 0.3;
+
+        const cGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, centerR);
+        cGrad.addColorStop(0, `rgba(139, 92, 246, ${0.025 * breathe3})`);
+        cGrad.addColorStop(0.5, `rgba(6, 182, 212, ${0.012 * breathe3})`);
+        cGrad.addColorStop(1, 'transparent');
+        ctx.fillStyle = cGrad;
+        ctx.fillRect(0, 0, w, h);
+      }
+
+      animId = requestAnimationFrame(draw);
+    };
+
+    // Preload logo
+    const logo = new Image();
+    logo.src = '/logo-transparent.png';
+    logo.onload = () => { draw(); };
+    if (logo.complete) draw();
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true">
-      {/* x.ai-style smoky light from top-right — breathing animation */}
-      <div
-        className="absolute top-[-10%] right-[-5%] w-[60%] h-[60%] animate-breathe"
-        style={{
-          background: isDark
-            ? 'radial-gradient(ellipse at center, rgba(160, 195, 255, 0.08) 0%, rgba(120, 165, 255, 0.04) 30%, rgba(80, 130, 255, 0.015) 60%, transparent 80%)'
-            : 'radial-gradient(ellipse at center, rgba(139, 92, 246, 0.06) 0%, rgba(139, 92, 246, 0.025) 30%, transparent 60%)',
-        }}
-      />
-
-      {/* Secondary light from mid-right — slower breathing */}
-      <div
-        className="absolute bottom-[10%] right-[-5%] w-[40%] h-[40%] animate-breathe-slow"
-        style={{
-          background: isDark
-            ? 'radial-gradient(ellipse at center, rgba(100, 160, 255, 0.06) 0%, rgba(70, 120, 255, 0.03) 40%, transparent 70%)'
-            : 'radial-gradient(ellipse at center, rgba(6, 182, 212, 0.04) 0%, transparent 50%)',
-        }}
-      />
-
-      {/* Subtle ambient glow bottom-left */}
-      <div
-        className="absolute bottom-[-15%] left-[-10%] w-[50%] h-[50%]"
-        style={{
-          background: isDark
-            ? 'radial-gradient(ellipse at center, rgba(100, 80, 200, 0.04) 0%, transparent 60%)'
-            : 'radial-gradient(ellipse at center, rgba(139, 92, 246, 0.025) 0%, transparent 50%)',
-        }}
-      />
-
-      {/* Third subtle glow top-left for depth */}
-      <div
-        className="absolute top-[-5%] left-[-5%] w-[35%] h-[35%] animate-breathe-slow"
-        style={{
-          background: isDark
-            ? 'radial-gradient(ellipse at center, rgba(139, 92, 246, 0.04) 0%, transparent 60%)'
-            : 'radial-gradient(ellipse at center, rgba(236, 72, 153, 0.025) 0%, transparent 50%)',
-        }}
-      />
-
-      {/* Light sweep effect — x.ai style moving gradient */}
-      <div
-        className="absolute top-0 right-0 w-[80%] h-[50%] opacity-30"
-        style={{
-          background: isDark
-            ? 'linear-gradient(225deg, rgba(160, 195, 255, 0.06) 0%, transparent 40%, transparent 60%, rgba(120, 165, 255, 0.03) 100%)'
-            : 'linear-gradient(225deg, rgba(139, 92, 246, 0.04) 0%, transparent 40%, transparent 60%, rgba(6, 182, 212, 0.02) 100%)',
-        }}
-      />
-
-      {/* ── Dark mode: Centered logo watermark with rotating glow ring ── */}
-      {isDark && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="relative">
-            {/* Rotating glow ring — spins around the logo */}
-            <div className="absolute inset-0 animate-[spin_25s_linear_infinite]">
-              {/* Top glow spot */}
-              <div
-                className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[35vmin] h-[35vmin] rounded-full blur-[80px]"
-                style={{
-                  background: 'radial-gradient(circle, rgba(100, 170, 255, 0.14) 0%, rgba(80, 140, 255, 0.06) 40%, transparent 70%)',
-                }}
-              />
-              {/* Bottom glow spot */}
-              <div
-                className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-[30vmin] h-[30vmin] rounded-full blur-[80px]"
-                style={{
-                  background: 'radial-gradient(circle, rgba(130, 180, 255, 0.12) 0%, rgba(100, 150, 255, 0.05) 40%, transparent 70%)',
-                }}
-              />
-              {/* Left glow spot */}
-              <div
-                className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[28vmin] h-[28vmin] rounded-full blur-[80px]"
-                style={{
-                  background: 'radial-gradient(circle, rgba(160, 130, 255, 0.11) 0%, rgba(139, 92, 246, 0.04) 40%, transparent 70%)',
-                }}
-              />
-              {/* Right glow spot */}
-              <div
-                className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-[32vmin] h-[32vmin] rounded-full blur-[80px]"
-                style={{
-                  background: 'radial-gradient(circle, rgba(120, 175, 255, 0.13) 0%, rgba(90, 145, 255, 0.05) 40%, transparent 70%)',
-                }}
-              />
-            </div>
-
-            {/* The actual logo — semi-transparent, NO background */}
-            <img
-              src="/logo-transparent.png"
-              alt=""
-              className="w-[55vmin] h-[55vmin] object-contain opacity-[0.08]"
-              style={{ filter: 'brightness(1.3) contrast(1.1) saturate(1.2)' }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* ── Light mode: NO logo watermark, just very subtle gradient effects ── */}
-      {!isDark && (
-        <>
-          {/* Very subtle center glow instead of logo */}
-          <div
-            className="absolute inset-0 flex items-center justify-center"
-          >
-            <div
-              className="w-[50vmin] h-[50vmin] rounded-full animate-breathe-slow"
-              style={{
-                background: 'radial-gradient(circle, rgba(139, 92, 246, 0.03) 0%, rgba(6, 182, 212, 0.015) 40%, transparent 70%)',
-              }}
-            />
-          </div>
-        </>
-      )}
-    </div>
+    <canvas
+      ref={canvasRef}
+      className="pointer-events-none fixed inset-0 z-0"
+      aria-hidden="true"
+    />
   );
 }

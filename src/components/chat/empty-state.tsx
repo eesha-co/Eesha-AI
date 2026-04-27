@@ -48,35 +48,12 @@ const suggestions = [
 
 export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center px-4 py-8">
-      {/* Animated Logo with Glow */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="relative mb-8"
-      >
-        {/* Outer glow ring */}
-        <div className="absolute inset-0 -m-6 rounded-full animate-glow-pulse" />
-
-        {/* Pulsing glow behind logo */}
-        <div className="absolute inset-0 -m-4 rounded-full bg-gradient-to-br from-violet-500/20 via-transparent to-cyan-500/20 blur-xl animate-breathe" />
-
-        {/* Logo container */}
-        <div className="relative flex size-20 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600/10 to-cyan-600/10 border border-border backdrop-blur-sm">
-          <img
-            src="/logo-transparent.png"
-            alt="Eesha AI"
-            className="size-14 object-contain animate-subtle-float"
-          />
-        </div>
-      </motion.div>
-
-      {/* Headline */}
+    <div className="flex flex-1 flex-col items-center justify-center px-4 py-8 relative z-10">
+      {/* Headline — no logo here, the background handles visual flair */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.15 }}
+        transition={{ duration: 0.5, delay: 0.1 }}
         className="text-center mb-8"
       >
         <h2 className="text-2xl sm:text-3xl font-light text-foreground/90 mb-2">
@@ -91,7 +68,7 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
+        transition={{ duration: 0.5, delay: 0.25 }}
         className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg"
       >
         {suggestions.map((suggestion, index) => {
@@ -101,7 +78,7 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
               key={suggestion.title}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.35 + index * 0.08 }}
+              transition={{ duration: 0.3, delay: 0.3 + index * 0.08 }}
               onClick={() => onSuggestionClick?.(suggestion.prompt)}
               className={`suggestion-card group relative rounded-xl border border-border p-4 text-left transition-all duration-200 ${suggestion.borderHover} hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5`}
             >
@@ -123,7 +100,7 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.6 }}
+        transition={{ duration: 0.5, delay: 0.55 }}
         className="mt-8 flex items-center gap-2 text-[11px] text-[var(--text-tertiary)]"
       >
         <Rocket className="size-3 text-primary/50" />

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useWorkspaceStore } from '@/stores/workspace-store';
-import { X, Save, FileCode, Binary } from 'lucide-react';
+import { X, Save, FileCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 function getLanguageFromPath(path: string): string {
@@ -57,10 +57,10 @@ export function CodeEditor() {
 
   if (openFiles.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-[#0a0a12] text-zinc-600">
+      <div className="flex h-full flex-col items-center justify-center bg-card text-muted-foreground">
         <FileCode className="mb-3 size-12 opacity-30" />
         <p className="text-sm">No file open</p>
-        <p className="mt-1 text-xs text-zinc-700">Click a file in the explorer or ask the AI to create one</p>
+        <p className="mt-1 text-xs text-[var(--text-tertiary)]">Click a file in the explorer or ask the AI to create one</p>
       </div>
     );
   }
@@ -69,23 +69,23 @@ export function CodeEditor() {
   const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
 
   return (
-    <div className="flex h-full flex-col bg-[#0a0a12]">
+    <div className="flex h-full flex-col bg-card">
       {/* Tab bar */}
-      <div className="flex items-center border-b border-white/[0.06] bg-[#0c0c14] shrink-0">
+      <div className="flex items-center border-b border-border bg-[var(--surface-secondary)] shrink-0">
         <div className="flex flex-1 overflow-x-auto">
           {openFiles.map((file) => (
             <button
               key={file.path}
               onClick={() => setActiveFile(file.path)}
-              className={`group flex items-center gap-1.5 border-r border-white/[0.06] px-3 py-2 text-xs transition-colors shrink-0 ${
-                file.path === activeFilePath ? 'bg-[#0a0a12] text-zinc-200' : 'bg-[#0c0c14] text-zinc-500 hover:text-zinc-300'
+              className={`group flex items-center gap-1.5 border-r border-border px-3 py-2 text-xs transition-colors shrink-0 ${
+                file.path === activeFilePath ? 'bg-card text-foreground' : 'bg-[var(--surface-secondary)] text-muted-foreground hover:text-foreground'
               }`}
             >
-              {file.modified && <span className="size-1.5 rounded-full bg-amber-400" />}
+              {file.modified && <span className="size-1.5 rounded-full bg-amber-500" />}
               <span className="max-w-[120px] truncate">{file.path.split('/').pop()}</span>
               <span
                 onClick={(e) => { e.stopPropagation(); closeFile(file.path); }}
-                className="ml-1 rounded p-0.5 opacity-0 transition-opacity hover:bg-white/[0.08] group-hover:opacity-100"
+                className="ml-1 rounded p-0.5 opacity-0 transition-opacity hover:bg-accent group-hover:opacity-100"
               >
                 <X className="size-3" />
               </span>
@@ -93,11 +93,11 @@ export function CodeEditor() {
           ))}
         </div>
         <div className="flex items-center gap-1 px-2 shrink-0">
-          {saveStatus && <span className="text-[11px] text-emerald-400">{saveStatus}</span>}
+          {saveStatus && <span className="text-[11px] text-emerald-500">{saveStatus}</span>}
           <Button
             variant="ghost"
             size="icon"
-            className="size-6 text-zinc-500 hover:text-zinc-300"
+            className="size-6 text-muted-foreground hover:text-foreground"
             onClick={handleSave}
             disabled={!activeFile?.modified}
             title="Save (Ctrl+S)"
@@ -109,13 +109,13 @@ export function CodeEditor() {
 
       {/* File info bar */}
       {activeFile && (
-        <div className="flex items-center gap-2 border-b border-white/[0.06] px-3 py-1 shrink-0">
-          <span className="text-[10px] text-zinc-600">{activeFile.path}</span>
-          <span className="rounded bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-violet-400">
+        <div className="flex items-center gap-2 border-b border-border px-3 py-1 shrink-0">
+          <span className="text-[10px] text-muted-foreground">{activeFile.path}</span>
+          <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-primary">
             {getLanguageFromPath(activeFile.path)}
           </span>
-          {activeFile.modified && <span className="text-[10px] text-amber-400">Modified</span>}
-          <span className="text-[10px] text-zinc-700 ml-auto">
+          {activeFile.modified && <span className="text-[10px] text-amber-500">Modified</span>}
+          <span className="text-[10px] text-muted-foreground ml-auto">
             {lineCount} lines
           </span>
         </div>
@@ -126,7 +126,7 @@ export function CodeEditor() {
         <div className="relative flex-1 min-h-0">
           <div className="absolute inset-0 flex overflow-hidden">
             {/* Line numbers */}
-            <div className="w-12 select-none overflow-hidden border-r border-white/[0.04] bg-[#0c0c14] py-3 text-right font-mono text-[11px] leading-[1.6] text-zinc-700 shrink-0">
+            <div className="w-12 select-none overflow-hidden border-r border-border bg-[var(--surface-secondary)] py-3 text-right font-mono text-[11px] leading-[1.6] text-muted-foreground shrink-0">
               {lineNumbers.map((num) => (
                 <div key={num} className="pr-3">{num}</div>
               ))}
@@ -136,7 +136,7 @@ export function CodeEditor() {
               ref={textareaRef}
               value={activeFile.content}
               onChange={(e) => updateFileContent(activeFile.path, e.target.value)}
-              className="flex-1 resize-none bg-transparent p-3 font-mono text-[13px] leading-[1.6] text-zinc-200 outline-none min-w-0"
+              className="flex-1 resize-none bg-transparent p-3 font-mono text-[13px] leading-[1.6] text-foreground outline-none min-w-0"
               spellCheck={false}
             />
           </div>

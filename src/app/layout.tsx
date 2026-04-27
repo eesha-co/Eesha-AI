@@ -36,15 +36,32 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
+                  // Check localStorage for saved theme preference
+                  var saved = localStorage.getItem('eesha-theme');
                   var dark = window.matchMedia('(prefers-color-scheme: dark)');
-                  if (dark.matches) {
-                    document.documentElement.classList.add('dark');
-                  }
-                  dark.addEventListener('change', function(e) {
-                    if (e.matches) {
+
+                  function applyTheme(theme) {
+                    if (theme === 'dark' || (theme === 'system' && dark.matches) || (!theme && dark.matches)) {
                       document.documentElement.classList.add('dark');
                     } else {
                       document.documentElement.classList.remove('dark');
+                    }
+                  }
+
+                  // Apply theme immediately to prevent flash
+                  if (saved) {
+                    var parsed = JSON.parse(saved);
+                    applyTheme(parsed.mode || 'system');
+                  } else {
+                    applyTheme('system');
+                  }
+
+                  // Listen for system theme changes
+                  dark.addEventListener('change', function(e) {
+                    var current = localStorage.getItem('eesha-theme');
+                    var mode = current ? JSON.parse(current).mode : 'system';
+                    if (mode === 'system') {
+                      applyTheme('system');
                     }
                   });
                 } catch(e) {}

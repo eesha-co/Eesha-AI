@@ -39,23 +39,10 @@ export function CodeBlock({ language, code: rawCode }: CodeBlockProps) {
 
   const handleDownload = useCallback(() => {
     const extensions: Record<string, string> = {
-      javascript: '.js',
-      typescript: '.ts',
-      python: '.py',
-      rust: '.rs',
-      go: '.go',
-      java: '.java',
-      cpp: '.cpp',
-      c: '.c',
-      html: '.html',
-      css: '.css',
-      json: '.json',
-      bash: '.sh',
-      shell: '.sh',
-      sql: '.sql',
-      yaml: '.yml',
-      xml: '.xml',
-      markdown: '.md',
+      javascript: '.js', typescript: '.ts', python: '.py', rust: '.rs',
+      go: '.go', java: '.java', cpp: '.cpp', c: '.c',
+      html: '.html', css: '.css', json: '.json', bash: '.sh',
+      shell: '.sh', sql: '.sql', yaml: '.yml', xml: '.xml', markdown: '.md',
     };
     const ext = extensions[language.toLowerCase()] || '.txt';
     const blob = new Blob([code], { type: 'text/plain' });
@@ -70,8 +57,8 @@ export function CodeBlock({ language, code: rawCode }: CodeBlockProps) {
   return (
     <div className="code-block-container">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2">
-        <span className="rounded-md bg-white/[0.06] px-2 py-0.5 text-[11px] font-medium uppercase text-zinc-400">
+      <div className="flex items-center justify-between border-b border-border px-4 py-2">
+        <span className="rounded-md bg-[var(--surface-secondary)] px-2 py-0.5 text-[11px] font-medium uppercase text-muted-foreground">
           {language || 'code'}
         </span>
         <div className="flex items-center gap-1">
@@ -79,7 +66,7 @@ export function CodeBlock({ language, code: rawCode }: CodeBlockProps) {
             variant="ghost"
             size="icon"
             onClick={handleDownload}
-            className="size-7 text-zinc-500 hover:text-zinc-300"
+            className="size-7 text-muted-foreground hover:text-foreground"
             title="Download"
           >
             <Download className="size-3.5" />
@@ -88,11 +75,11 @@ export function CodeBlock({ language, code: rawCode }: CodeBlockProps) {
             variant="ghost"
             size="icon"
             onClick={handleCopy}
-            className="size-7 text-zinc-500 hover:text-zinc-300"
+            className="size-7 text-muted-foreground hover:text-foreground"
             title="Copy code"
           >
             {copied ? (
-              <Check className="size-3.5 text-emerald-400" />
+              <Check className="size-3.5 text-emerald-500" />
             ) : (
               <Copy className="size-3.5" />
             )}
@@ -117,7 +104,7 @@ export function CodeBlock({ language, code: rawCode }: CodeBlockProps) {
           lineNumberStyle={{
             minWidth: '2.5em',
             paddingRight: '1em',
-            color: 'rgba(255, 255, 255, 0.2)',
+            color: 'var(--text-tertiary)',
           }}
         >
           {displayCode}
@@ -125,16 +112,16 @@ export function CodeBlock({ language, code: rawCode }: CodeBlockProps) {
 
         {/* Gradient fade overlay for collapsed long code */}
         {isLong && !expanded && (
-          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#0d0d14] to-transparent" />
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[var(--surface-primary)] to-transparent" />
         )}
       </div>
 
       {/* Expand/Collapse button */}
       {isLong && (
-        <div className="border-t border-white/[0.06] px-4 py-1.5">
+        <div className="border-t border-border px-4 py-1.5">
           <button
             onClick={() => setExpanded(!expanded)}
-            className="flex w-full items-center justify-center gap-1 text-xs text-zinc-500 transition-colors hover:text-zinc-300"
+            className="flex w-full items-center justify-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
           >
             {expanded ? (
               <>

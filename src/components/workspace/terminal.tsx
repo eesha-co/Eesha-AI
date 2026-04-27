@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Terminal as TerminalIcon, Send, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Terminal as TerminalIcon, Send, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 
@@ -48,7 +48,6 @@ export function TerminalPanel() {
     setIsRunning(true);
     setInput('');
 
-    // Add to command history
     setCommandHistory((prev) => [...prev, { command, timestamp: Date.now() }]);
     setHistoryIndex(-1);
 
@@ -75,7 +74,6 @@ export function TerminalPanel() {
           setLines((prev) => [...prev, { type: 'output', content: '(command completed)', timestamp: Date.now() }]);
         }
 
-        // Auto-refresh workspace files after commands that might modify the filesystem
         const fileModifyingCommands = ['touch', 'mkdir', 'rm', 'cp', 'mv', 'nano', 'vim', 'cat >', 'echo >', 'curl', 'wget', 'git', 'npm', 'pip', 'bun', 'python', 'node', 'npx', 'yarn', 'pnpm'];
         const shouldRefresh = fileModifyingCommands.some(cmd => command.trimStart().startsWith(cmd));
         if (shouldRefresh) {
@@ -130,15 +128,15 @@ export function TerminalPanel() {
   }, [focusInput]);
 
   return (
-    <div className="flex h-full flex-col bg-[#0a0a12]" onClick={focusInput}>
+    <div className="flex h-full flex-col bg-card" onClick={focusInput}>
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-1.5">
+      <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
         <div className="flex items-center gap-1.5">
-          <TerminalIcon className="size-3 text-emerald-400" />
-          <span className="text-[11px] font-medium text-zinc-400">Terminal</span>
+          <TerminalIcon className="size-3 text-emerald-500" />
+          <span className="text-[11px] font-medium text-muted-foreground">Terminal</span>
           {isRunning && (
-            <span className="ml-1.5 inline-flex items-center gap-1 text-[10px] text-amber-400">
-              <span className="inline-block size-1.5 animate-pulse rounded-full bg-amber-400" />
+            <span className="ml-1.5 inline-flex items-center gap-1 text-[10px] text-amber-500">
+              <span className="inline-block size-1.5 animate-pulse rounded-full bg-amber-500" />
               Running...
             </span>
           )}
@@ -146,7 +144,7 @@ export function TerminalPanel() {
         <Button
           variant="ghost"
           size="icon"
-          className="size-5 text-zinc-600 hover:text-zinc-300"
+          className="size-5 text-muted-foreground hover:text-foreground"
           onClick={clearTerminal}
           title="Clear terminal (Ctrl+L)"
         >
@@ -157,7 +155,7 @@ export function TerminalPanel() {
       {/* Output area */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-auto p-3 font-mono text-[12px] leading-[1.7]"
+        className="flex-1 overflow-auto p-3 font-mono text-[12px] leading-[1.7] bg-[var(--surface-secondary)]"
         style={{ minHeight: 0 }}
       >
         {lines.map((line, i) => (
@@ -165,27 +163,27 @@ export function TerminalPanel() {
             key={i}
             className={`whitespace-pre-wrap break-all ${
               line.type === 'input'
-                ? 'text-emerald-400'
+                ? 'text-emerald-600 dark:text-emerald-400'
                 : line.type === 'error'
-                ? 'text-red-400'
+                ? 'text-red-600 dark:text-red-400'
                 : line.type === 'system'
-                ? 'text-zinc-600 italic'
-                : 'text-zinc-400'
+                ? 'text-muted-foreground italic'
+                : 'text-[var(--text-secondary)]'
             }`}
           >
             {line.content}
           </div>
         ))}
         {isRunning && (
-          <div className="flex items-center gap-1 text-emerald-400">
-            <span className="inline-block size-2 animate-pulse bg-emerald-400" />
+          <div className="flex items-center gap-1 text-emerald-500">
+            <span className="inline-block size-2 animate-pulse bg-emerald-500" />
           </div>
         )}
       </div>
 
       {/* Input area */}
-      <div className="flex items-center gap-2 border-t border-white/[0.06] px-3 py-2">
-        <span className="text-xs text-emerald-400 shrink-0">$</span>
+      <div className="flex items-center gap-2 border-t border-border px-3 py-2 bg-card">
+        <span className="text-xs text-emerald-600 dark:text-emerald-400 shrink-0">$</span>
         <input
           ref={inputRef}
           type="text"
@@ -194,14 +192,14 @@ export function TerminalPanel() {
           onKeyDown={handleKeyDown}
           disabled={isRunning}
           placeholder={isRunning ? 'Waiting for command to finish...' : 'Enter command... (↑↓ for history)'}
-          className="flex-1 bg-transparent font-mono text-xs text-zinc-200 outline-none placeholder-zinc-700 disabled:opacity-50"
+          className="flex-1 bg-transparent font-mono text-xs text-foreground outline-none placeholder-[var(--text-tertiary)] disabled:opacity-50"
           autoComplete="off"
           spellCheck={false}
         />
         <Button
           variant="ghost"
           size="icon"
-          className="size-6 shrink-0 text-zinc-500 hover:text-zinc-300"
+          className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
           onClick={() => executeCommand(input)}
           disabled={isRunning || !input.trim()}
         >

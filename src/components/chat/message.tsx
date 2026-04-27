@@ -22,22 +22,22 @@ function ThinkingBubble({ thinking, isThinking }: { thinking: string; isThinking
     <div className="mb-3">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="group flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors hover:bg-white/[0.04]"
+        className="group flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors hover:bg-accent"
       >
         {expanded ? (
-          <ChevronDown className="size-3 text-violet-400" />
+          <ChevronDown className="size-3 text-primary" />
         ) : (
-          <ChevronRight className="size-3 text-violet-400" />
+          <ChevronRight className="size-3 text-primary" />
         )}
-        <Brain className="size-3 text-violet-400" />
-        <span className="text-violet-400/80">
+        <Brain className="size-3 text-primary" />
+        <span className="text-primary/80">
           {isThinking ? 'Thinking...' : 'Reasoning'}
         </span>
         {isThinking && (
           <span className="flex gap-0.5 ml-1">
-            <span className="animate-thinking-dot inline-block size-1 rounded-full bg-violet-400" style={{ animationDelay: '0ms' }} />
-            <span className="animate-thinking-dot inline-block size-1 rounded-full bg-violet-400" style={{ animationDelay: '200ms' }} />
-            <span className="animate-thinking-dot inline-block size-1 rounded-full bg-violet-400" style={{ animationDelay: '400ms' }} />
+            <span className="animate-thinking-dot inline-block size-1 rounded-full bg-primary" style={{ animationDelay: '0ms' }} />
+            <span className="animate-thinking-dot inline-block size-1 rounded-full bg-primary" style={{ animationDelay: '200ms' }} />
+            <span className="animate-thinking-dot inline-block size-1 rounded-full bg-primary" style={{ animationDelay: '400ms' }} />
           </span>
         )}
       </button>
@@ -50,8 +50,8 @@ function ThinkingBubble({ thinking, isThinking }: { thinking: string; isThinking
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="ml-2 mt-1 rounded-lg border border-violet-500/10 bg-violet-500/[0.03] p-3">
-              <div className="prose-thinking text-xs leading-relaxed text-zinc-500">
+            <div className="ml-2 mt-1 rounded-lg border border-primary/10 bg-primary/[0.03] p-3">
+              <div className="prose-thinking text-xs leading-relaxed text-[var(--text-tertiary)]">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {thinking}
                 </ReactMarkdown>
@@ -67,12 +67,12 @@ function ThinkingBubble({ thinking, isThinking }: { thinking: string; isThinking
 function ThinkingIndicator() {
   return (
     <div className="flex items-center gap-2 px-1">
-      <Brain className="size-4 text-violet-400 animate-pulse" />
-      <span className="text-sm text-zinc-400">Thinking</span>
+      <Brain className="size-4 text-primary animate-pulse" />
+      <span className="text-sm text-muted-foreground">Thinking</span>
       <span className="flex gap-0.5">
-        <span className="animate-thinking-dot inline-block size-1.5 rounded-full bg-violet-400" style={{ animationDelay: '0ms' }} />
-        <span className="animate-thinking-dot inline-block size-1.5 rounded-full bg-violet-400" style={{ animationDelay: '200ms' }} />
-        <span className="animate-thinking-dot inline-block size-1.5 rounded-full bg-violet-400" style={{ animationDelay: '400ms' }} />
+        <span className="animate-thinking-dot inline-block size-1.5 rounded-full bg-primary" style={{ animationDelay: '0ms' }} />
+        <span className="animate-thinking-dot inline-block size-1.5 rounded-full bg-primary" style={{ animationDelay: '200ms' }} />
+        <span className="animate-thinking-dot inline-block size-1.5 rounded-full bg-primary" style={{ animationDelay: '400ms' }} />
       </span>
     </div>
   );
@@ -112,7 +112,7 @@ export function Message({ message, isStreaming, onRegenerate }: MessageProps) {
               variant="ghost"
               size="icon"
               onClick={handleCopy}
-              className="size-6 text-zinc-600 hover:text-zinc-300"
+              className="size-6 text-muted-foreground hover:text-foreground"
               title="Copy"
             >
               {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
@@ -132,8 +132,8 @@ export function Message({ message, isStreaming, onRegenerate }: MessageProps) {
       className="group flex gap-3"
     >
       {/* Avatar */}
-      <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-gradient-to-br from-violet-600/20 to-cyan-600/20">
-        <Code2 className="size-4 text-violet-400" />
+      <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl border border-border bg-gradient-to-br from-violet-600/20 to-cyan-600/20">
+        <Code2 className="size-4 text-primary" />
       </div>
 
       {/* Content */}
@@ -185,7 +185,7 @@ export function Message({ message, isStreaming, onRegenerate }: MessageProps) {
                 </div>
                 {/* Streaming cursor */}
                 {isStreaming && message.content && (
-                  <span className="animate-blink-cursor ml-0.5 inline-block size-2 rounded-full bg-cyan-400" />
+                  <span className="animate-blink-cursor ml-0.5 inline-block size-2 rounded-full bg-cyan-500" />
                 )}
               </div>
             )}
@@ -204,7 +204,7 @@ export function Message({ message, isStreaming, onRegenerate }: MessageProps) {
               variant="ghost"
               size="icon"
               onClick={handleCopy}
-              className="size-6 text-zinc-600 hover:text-zinc-300"
+              className="size-6 text-muted-foreground hover:text-foreground"
               title="Copy"
             >
               {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
@@ -214,7 +214,7 @@ export function Message({ message, isStreaming, onRegenerate }: MessageProps) {
                 variant="ghost"
                 size="icon"
                 onClick={onRegenerate}
-                className="size-6 text-zinc-600 hover:text-zinc-300"
+                className="size-6 text-muted-foreground hover:text-foreground"
                 title="Regenerate"
               >
                 <RefreshCw className="size-3" />

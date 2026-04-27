@@ -31,7 +31,6 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
     if (!input.trim() || isStreaming) return;
     onSend(input.trim());
     setInput('');
-    // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -48,15 +47,15 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
   );
 
   return (
-    <div className="shrink-0 border-t border-white/[0.06] bg-gradient-to-t from-[#0a0a12] to-[#0a0a12]/80 px-4 pb-4 pt-3">
+    <div className="shrink-0 border-t border-border bg-gradient-to-t from-background to-background/80 px-4 pb-4 pt-3">
       <div className="mx-auto max-w-[768px]">
         {/* Input container */}
-        <div className="input-glow relative rounded-2xl border border-white/[0.08] bg-white/[0.02] transition-all duration-300 focus-within:border-violet-500/30 focus-within:bg-white/[0.03] focus-within:shadow-lg focus-within:shadow-violet-500/5">
+        <div className="input-glow relative rounded-2xl border border-border bg-[var(--surface-secondary)] transition-all duration-300 focus-within:border-primary/30 focus-within:bg-[var(--surface-tertiary)] focus-within:shadow-lg focus-within:shadow-primary/5">
           <div className="flex items-end gap-2 p-3">
             {/* Model indicator */}
             <div className="mb-0.5 flex items-center gap-1.5 shrink-0">
-              <div className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600/20 to-cyan-600/20 border border-white/[0.06]">
-                <Code2 className="size-3.5 text-violet-400" />
+              <div className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600/20 to-cyan-600/20 border border-border">
+                <Code2 className="size-3.5 text-primary" />
               </div>
             </div>
 
@@ -68,7 +67,7 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
               onKeyDown={handleKeyDown}
               placeholder="Ask Eesha AI to write, debug, or explain code..."
               rows={1}
-              className="max-h-[200px] min-h-[28px] flex-1 resize-none bg-transparent text-sm leading-relaxed text-zinc-200 placeholder-zinc-600 outline-none"
+              className="max-h-[200px] min-h-[28px] flex-1 resize-none bg-transparent text-sm leading-relaxed text-foreground placeholder-[var(--text-tertiary)] outline-none"
             />
 
             {/* Send / Stop button */}
@@ -116,10 +115,10 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
         {/* Bottom info */}
         <div className="mt-2 flex items-center justify-between px-1">
           <div className="flex items-center gap-1.5">
-            <Sparkles className="size-3 text-violet-500/50" />
-            <span className="text-[11px] text-zinc-600">Eesha AI with Thinking Mode</span>
+            <Sparkles className="size-3 text-primary/50" />
+            <span className="text-[11px] text-[var(--text-tertiary)]">Eesha AI with Thinking Mode</span>
           </div>
-          <span className="text-[11px] text-zinc-600">
+          <span className="text-[11px] text-[var(--text-tertiary)]">
             AI can make mistakes. Review code carefully.
           </span>
         </div>

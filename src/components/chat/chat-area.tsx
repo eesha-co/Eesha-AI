@@ -17,7 +17,6 @@ export function ChatArea({ onRegenerate }: ChatAreaProps) {
   const messages = activeConversation?.messages ?? [];
 
   useEffect(() => {
-    // Auto-scroll to bottom on new messages
     const timer = setTimeout(() => {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 50);

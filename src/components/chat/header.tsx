@@ -3,7 +3,6 @@
 import { useChatStore } from '@/stores/chat-store';
 import { PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import Image from 'next/image';
 
 export function Header() {
   const { sidebarOpen, setSidebarOpen, activeConversationId, conversations } = useChatStore();
@@ -18,14 +17,14 @@ export function Header() {
           <Button
             variant="ghost"
             size="icon"
-            className="size-7 text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06]"
+            className="size-7 text-muted-foreground hover:text-foreground hover:bg-accent"
             onClick={() => setSidebarOpen(true)}
           >
             <PanelLeft className="size-4" />
           </Button>
           <div className="flex items-center gap-2">
             <img src="/logo-256.png" alt="Eesha AI" className="size-6" />
-            <span className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-sm font-semibold text-transparent">
+            <span className="bg-gradient-to-r from-violet-500 to-cyan-500 bg-clip-text text-sm font-semibold text-transparent">
               Eesha AI
             </span>
           </div>
@@ -33,8 +32,8 @@ export function Header() {
       )}
       {showTitle && (
         <>
-          <div className="h-4 w-px bg-white/[0.06]" />
-          <h1 className="max-w-[300px] truncate text-sm font-medium text-zinc-400">
+          <div className="h-4 w-px bg-border" />
+          <h1 className="max-w-[300px] truncate text-sm font-medium text-muted-foreground">
             {activeConversation.title}
           </h1>
         </>

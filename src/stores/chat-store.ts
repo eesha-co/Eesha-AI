@@ -1,11 +1,13 @@
 import { create } from 'zustand';
 
+export type ThemeMode = 'light' | 'dark' | 'system';
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  thinking?: string; // Chain-of-thought reasoning
-  isThinking?: boolean; // Currently receiving thinking content
+  thinking?: string;
+  isThinking?: boolean;
   createdAt?: string;
 }
 
@@ -22,11 +24,13 @@ interface ChatState {
   activeConversationId: string | null;
   isStreaming: boolean;
   sidebarOpen: boolean;
+  themeMode: ThemeMode;
 
   setConversations: (conversations: Conversation[]) => void;
   setActiveConversation: (id: string | null) => void;
   setIsStreaming: (streaming: boolean) => void;
   setSidebarOpen: (open: boolean) => void;
+  setThemeMode: (mode: ThemeMode) => void;
 
   addConversation: (conversation: Conversation) => void;
   deleteConversation: (id: string) => void;
@@ -40,16 +44,50 @@ interface ChatState {
   getActiveConversation: () => Conversation | undefined;
 }
 
+function getInitialTheme(): ThemeMode {
+  if (typeof window === 'undefined') return 'system';
+  try {
+    const saved = localStorage.getItem('eesha-theme');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return parsed.mode || 'system';
+    }
+  } catch {}
+  return 'system';
+}
+
+function applyTheme(mode: ThemeMode) {
+  if (typeof window === 'undefined') return;
+  const dark = window.matchMedia('(prefers-color-scheme: dark)');
+  const shouldBeDark = mode === 'dark' || (mode === 'system' && dark.matches);
+
+  if (shouldBeDark) {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+
+  try {
+    localStorage.setItem('eesha-theme', JSON.stringify({ mode }));
+  } catch {}
+}
+
 export const useChatStore = create<ChatState>((set, get) => ({
   conversations: [],
   activeConversationId: null,
   isStreaming: false,
   sidebarOpen: true,
+  themeMode: getInitialTheme(),
 
   setConversations: (conversations) => set({ conversations }),
   setActiveConversation: (id) => set({ activeConversationId: id }),
   setIsStreaming: (streaming) => set({ isStreaming: streaming }),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
+
+  setThemeMode: (mode) => {
+    applyTheme(mode);
+    set({ themeMode: mode });
+  },
 
   addConversation: (conversation) =>
     set((state) => ({

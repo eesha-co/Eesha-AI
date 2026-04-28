@@ -12,7 +12,7 @@ import { FileExplorer } from '@/components/workspace/file-explorer';
 import { CodeEditor } from '@/components/workspace/code-editor';
 import { TerminalPanel } from '@/components/workspace/terminal';
 import { Button } from '@/components/ui/button';
-import { Code2, Terminal, MessageSquare, X } from 'lucide-react';
+import { Code2, Terminal, MessageSquare } from 'lucide-react';
 import { SmokyBackground } from '@/components/chat/smoky-background';
 
 type ActivePanel = 'chat' | 'workspace' | 'terminal';
@@ -79,18 +79,23 @@ export default function Home() {
   const hasSidePanel = showWorkspace || showTerminal;
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen overflow-hidden">
+      {/* Canvas background — draws ALL visual effects */}
       <SmokyBackground />
+
+      {/* Sidebar — semi-transparent so effects glow through */}
       <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* Header bar */}
-        <div className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-background/80 px-3 backdrop-blur-xl">
+
+      {/* Main content area — TRANSPARENT background so canvas shows through */}
+      <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden" style={{ zIndex: 1 }}>
+        {/* Header bar — glass morphism, semi-transparent */}
+        <div className="flex h-11 shrink-0 items-center justify-between border-b border-white/5 dark:border-white/5 bg-background/60 dark:bg-black/40 px-3 backdrop-blur-xl">
           <Header />
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="sm"
-              className={`h-7 gap-1.5 text-xs ${!hasSidePanel ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`h-7 gap-1.5 text-xs ${!hasSidePanel ? 'bg-white/10 dark:bg-white/10 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={() => { setShowWorkspace(false); setShowTerminal(false); }}
             >
               <MessageSquare className="size-3" />Chat
@@ -98,7 +103,7 @@ export default function Home() {
             <Button
               variant="ghost"
               size="sm"
-              className={`h-7 gap-1.5 text-xs ${showWorkspace ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`h-7 gap-1.5 text-xs ${showWorkspace ? 'bg-white/10 dark:bg-white/10 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={toggleWorkspace}
             >
               <Code2 className="size-3" />Workspace
@@ -106,7 +111,7 @@ export default function Home() {
             <Button
               variant="ghost"
               size="sm"
-              className={`h-7 gap-1.5 text-xs ${showTerminal ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`h-7 gap-1.5 text-xs ${showTerminal ? 'bg-white/10 dark:bg-white/10 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={toggleTerminal}
             >
               <Terminal className="size-3" />Terminal
@@ -116,9 +121,9 @@ export default function Home() {
 
         {/* Main content area */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
-          {/* Chat panel */}
+          {/* Chat panel — TRANSPARENT so effects show through */}
           <div className={`flex flex-col min-w-0 overflow-hidden ${
-            hasSidePanel ? 'w-1/2 border-r border-border' : 'flex-1'
+            hasSidePanel ? 'w-1/2 border-r border-white/5 dark:border-white/5' : 'flex-1'
           }`}>
             {hasMessages ? (
               <ChatArea onRegenerate={() => {
@@ -133,7 +138,7 @@ export default function Home() {
             <InputArea onSend={sendMessage} onStop={stopStreaming} isStreaming={isStreaming} />
           </div>
 
-          {/* Side panel area */}
+          {/* Side panel area — semi-transparent panels */}
           {hasSidePanel && (
             <div className="flex flex-col w-1/2 min-w-0 overflow-hidden">
               {/* Workspace only */}
@@ -156,7 +161,7 @@ export default function Home() {
                     <div className="w-44 shrink-0 overflow-hidden"><FileExplorer /></div>
                     <div className="flex-1 min-w-0 overflow-hidden"><CodeEditor /></div>
                   </div>
-                  <div className="h-48 shrink-0 border-t border-border overflow-hidden">
+                  <div className="h-48 shrink-0 border-t border-white/5 dark:border-white/5 overflow-hidden">
                     <TerminalPanel />
                   </div>
                 </>

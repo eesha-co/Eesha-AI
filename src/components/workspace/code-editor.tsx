@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useWorkspaceStore } from '@/stores/workspace-store';
-import { X, Save, FileCode } from 'lucide-react';
+import { X, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { LogoWatermark } from '@/components/chat/logo-watermark';
 
 function getLanguageFromPath(path: string): string {
   const ext = path.split('.').pop()?.toLowerCase() || '';
@@ -58,12 +57,40 @@ export function CodeEditor() {
 
   if (openFiles.length === 0) {
     return (
-      <div className="relative flex h-full flex-col items-center justify-center bg-white/30 dark:bg-black/30 backdrop-blur-sm text-muted-foreground overflow-hidden">
-        <LogoWatermark opacity={0.08} sizeFraction={0.5} />
-        <div className="relative z-10 flex flex-col items-center">
-          <FileCode className="mb-3 size-12 opacity-30" />
-          <p className="text-sm">No file open</p>
-          <p className="mt-1 text-xs text-[var(--text-tertiary)]">Click a file in the explorer or ask the AI to create one</p>
+      <div className="relative flex h-full flex-col items-center justify-center bg-white/20 dark:bg-black/20 backdrop-blur-sm text-muted-foreground overflow-hidden">
+        {/* Large centered logo watermark */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <img
+            src="/logo-transparent.png"
+            alt="Eesha AI"
+            className="object-contain animate-breathe-slow select-none"
+            style={{
+              maxWidth: '65%',
+              maxHeight: '65%',
+              opacity: 0.12,
+              filter: 'brightness(1.4) saturate(1.3)',
+            }}
+          />
+        </div>
+        {/* Centered content over the logo */}
+        <div className="relative z-10 flex flex-col items-center gap-4">
+          <div className="relative">
+            <img
+              src="/logo-transparent.png"
+              alt="Eesha AI"
+              className="size-28 object-contain drop-shadow-lg"
+              style={{ filter: 'brightness(1.1) saturate(1.2)' }}
+            />
+            {/* Glow ring around the logo icon */}
+            <div className="absolute inset-0 rounded-full animate-glow-pulse opacity-60" />
+          </div>
+          <div className="text-center">
+            <h2 className="text-xl font-semibold bg-gradient-to-r from-violet-500 via-cyan-400 to-violet-500 bg-clip-text text-transparent">
+              Eesha AI
+            </h2>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">Workspace</p>
+            <p className="mt-1 text-xs text-[var(--text-tertiary)]">Open a file from the explorer or ask the AI to create one</p>
+          </div>
         </div>
       </div>
     );

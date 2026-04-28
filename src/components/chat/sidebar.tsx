@@ -123,7 +123,7 @@ export function Sidebar() {
         initial={false}
         animate={{ width: sidebarOpen ? 280 : 0, opacity: sidebarOpen ? 1 : 0 }}
         transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-        className="relative flex-shrink-0 overflow-hidden border-r border-border bg-sidebar/95 backdrop-blur-xl"
+        className="relative flex-shrink-0 overflow-hidden border-r border-white/5 dark:border-white/5 bg-white/80 dark:bg-black/60 backdrop-blur-2xl"
         style={{ maxWidth: sidebarOpen ? 280 : 0 }}
       >
         <div className="flex h-full w-[280px] flex-col">

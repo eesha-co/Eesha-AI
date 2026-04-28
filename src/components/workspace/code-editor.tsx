@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { X, Save, FileCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { LogoWatermark } from '@/components/chat/logo-watermark';
 
 function getLanguageFromPath(path: string): string {
   const ext = path.split('.').pop()?.toLowerCase() || '';
@@ -57,10 +58,13 @@ export function CodeEditor() {
 
   if (openFiles.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-card text-muted-foreground">
-        <FileCode className="mb-3 size-12 opacity-30" />
-        <p className="text-sm">No file open</p>
-        <p className="mt-1 text-xs text-[var(--text-tertiary)]">Click a file in the explorer or ask the AI to create one</p>
+      <div className="relative flex h-full flex-col items-center justify-center bg-card text-muted-foreground overflow-hidden">
+        <LogoWatermark opacity={0.06} sizeFraction={0.5} />
+        <div className="relative z-10 flex flex-col items-center">
+          <FileCode className="mb-3 size-12 opacity-30" />
+          <p className="text-sm">No file open</p>
+          <p className="mt-1 text-xs text-[var(--text-tertiary)]">Click a file in the explorer or ask the AI to create one</p>
+        </div>
       </div>
     );
   }

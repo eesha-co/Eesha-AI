@@ -73,6 +73,25 @@ export default function RootLayout({
             color: #71717a;
             letter-spacing: 0.1em;
           }
+          #eesha-splash .splash-ring {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            border: 1px solid rgba(139, 92, 246, 0.15);
+            animation: splash-ring-rotate 6s linear infinite;
+          }
+          #eesha-splash .splash-ring::after {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: 50%;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: rgba(139, 92, 246, 0.6);
+            box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
+          }
           @keyframes splash-breathe {
             0%, 100% { opacity: 0.7; transform: scale(1); }
             50% { opacity: 1; transform: scale(1.06); }
@@ -81,11 +100,22 @@ export default function RootLayout({
             0% { opacity: 0.6; }
             100% { opacity: 1; }
           }
+          @keyframes splash-ring-rotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
           html:not(.dark) #eesha-splash {
             background: #f5f5fa;
           }
           html:not(.dark) #eesha-splash .splash-sub {
             color: #9ca3af;
+          }
+          html:not(.dark) #eesha-splash .splash-ring {
+            border-color: rgba(124, 58, 237, 0.12);
+          }
+          html:not(.dark) #eesha-splash .splash-ring::after {
+            background: rgba(124, 58, 237, 0.5);
+            box-shadow: 0 0 10px rgba(124, 58, 237, 0.3);
           }
         `}} />
         <script
@@ -132,6 +162,7 @@ export default function RootLayout({
       >
         {/* Splash screen — pure HTML/CSS, removed by JS after mount */}
         <div id="eesha-splash">
+          <div className="splash-ring" />
           <img src="/logo-transparent.png" alt="Eesha AI" />
           <div className="splash-text">Eesha AI</div>
           <div className="splash-sub">LOADING</div>

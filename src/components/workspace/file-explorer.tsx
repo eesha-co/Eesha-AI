@@ -138,7 +138,13 @@ export function FileExplorer() {
             <FileTreeItem key={entry.path} entry={entry} depth={0} />
           ))}
           {files.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-10 text-[11px] text-muted-foreground">
+            <div className="relative flex flex-col items-center justify-center py-10 text-[11px] text-muted-foreground">
+              <img
+                src="/logo-transparent.png"
+                alt=""
+                className="size-16 object-contain opacity-10 mb-3 animate-breathe-slow"
+                style={{ filter: 'brightness(1.3) saturate(1.2)' }}
+              />
               Empty directory
             </div>
           )}

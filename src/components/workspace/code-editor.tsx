@@ -58,8 +58,8 @@ export function CodeEditor() {
 
   if (openFiles.length === 0) {
     return (
-      <div className="relative flex h-full flex-col items-center justify-center bg-card text-muted-foreground overflow-hidden">
-        <LogoWatermark opacity={0.06} sizeFraction={0.5} />
+      <div className="relative flex h-full flex-col items-center justify-center bg-white/30 dark:bg-black/30 backdrop-blur-sm text-muted-foreground overflow-hidden">
+        <LogoWatermark opacity={0.08} sizeFraction={0.5} />
         <div className="relative z-10 flex flex-col items-center">
           <FileCode className="mb-3 size-12 opacity-30" />
           <p className="text-sm">No file open</p>
@@ -73,7 +73,7 @@ export function CodeEditor() {
   const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
 
   return (
-    <div className="flex h-full flex-col bg-card">
+    <div className="flex h-full flex-col bg-white/50 dark:bg-black/40 backdrop-blur-sm">
       {/* Tab bar */}
       <div className="flex items-center border-b border-border bg-[var(--surface-secondary)] shrink-0">
         <div className="flex flex-1 overflow-x-auto">

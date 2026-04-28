@@ -83,14 +83,14 @@ export default function Home() {
       <SmokyBackground />
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* Header bar — ultra minimal like x.ai */}
-        <div className="flex h-10 shrink-0 items-center justify-between px-3 relative z-10">
+        {/* Header bar */}
+        <div className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-background/80 px-3 backdrop-blur-xl">
           <Header />
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="sm"
-              className={`h-7 gap-1.5 rounded-lg text-xs ${!hasSidePanel ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`h-7 gap-1.5 text-xs ${!hasSidePanel ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={() => { setShowWorkspace(false); setShowTerminal(false); }}
             >
               <MessageSquare className="size-3" />Chat
@@ -98,18 +98,18 @@ export default function Home() {
             <Button
               variant="ghost"
               size="sm"
-              className={`h-7 gap-1.5 rounded-lg text-xs ${showWorkspace ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`h-7 gap-1.5 text-xs ${showWorkspace ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={toggleWorkspace}
             >
-              <Code2 className="size-3" />Code
+              <Code2 className="size-3" />Workspace
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              className={`h-7 gap-1.5 rounded-lg text-xs ${showTerminal ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`h-7 gap-1.5 text-xs ${showTerminal ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={toggleTerminal}
             >
-              <Terminal className="size-3" />Term
+              <Terminal className="size-3" />Terminal
             </Button>
           </div>
         </div>

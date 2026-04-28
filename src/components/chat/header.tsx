@@ -1,7 +1,7 @@
 'use client';
 
 import { useChatStore } from '@/stores/chat-store';
-import { PanelLeft, ChevronDown, Sparkles } from 'lucide-react';
+import { PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export function Header() {
@@ -22,16 +22,11 @@ export function Header() {
           >
             <PanelLeft className="size-4" />
           </Button>
+          <span className="bg-gradient-to-r from-violet-500 to-cyan-500 bg-clip-text text-sm font-semibold text-transparent">
+            Eesha AI
+          </span>
         </>
       )}
-
-      {/* Model selector — like x.ai/z.ai style */}
-      <button className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-[var(--text-secondary)] transition-colors hover:bg-accent hover:text-foreground">
-        <Sparkles className="size-3.5 text-primary" />
-        <span className="font-medium">Eesha AI</span>
-        <ChevronDown className="size-3 opacity-40" />
-      </button>
-
       {showTitle && (
         <>
           <div className="h-4 w-px bg-border" />

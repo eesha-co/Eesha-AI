@@ -123,7 +123,7 @@ export function Message({ message, isStreaming, onRegenerate }: MessageProps) {
     );
   }
 
-  // Assistant message — clean like x.ai
+  // Assistant message
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -131,9 +131,9 @@ export function Message({ message, isStreaming, onRegenerate }: MessageProps) {
       transition={{ duration: 0.25, ease: 'easeOut' }}
       className="group flex gap-3"
     >
-      {/* Avatar — small gradient sparkles */}
-      <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600/20 to-cyan-600/20 border border-border/50">
-        <Sparkles className="size-3.5 text-primary" />
+      {/* Avatar — small sparkles icon */}
+      <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl border border-border bg-gradient-to-br from-violet-600/20 to-cyan-600/20">
+        <Sparkles className="size-4 text-primary" />
       </div>
 
       {/* Content */}
@@ -149,7 +149,7 @@ export function Message({ message, isStreaming, onRegenerate }: MessageProps) {
 
             {/* Main response content */}
             {message.content && (
-              <div className="border-l-2 border-primary/20 pl-3">
+              <div className="border-l-2 border-cyan-500/30 pl-3">
                 <div className="prose-chat">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
@@ -185,7 +185,7 @@ export function Message({ message, isStreaming, onRegenerate }: MessageProps) {
                 </div>
                 {/* Streaming cursor */}
                 {isStreaming && message.content && (
-                  <span className="animate-blink-cursor ml-0.5 inline-block size-2 rounded-full bg-primary/60" />
+                  <span className="animate-blink-cursor ml-0.5 inline-block size-2 rounded-full bg-cyan-500" />
                 )}
               </div>
             )}

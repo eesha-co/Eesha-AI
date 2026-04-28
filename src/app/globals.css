@@ -46,7 +46,7 @@
 /* ─── Light Mode ──────────────────────────────────────────── */
 :root {
   --radius: 0.625rem;
-  --background: #f8f8fc;
+  --background: #f5f5fa;
   --foreground: #1a1a2e;
   --card: #ffffff;
   --card-foreground: #1a1a2e;
@@ -54,15 +54,15 @@
   --popover-foreground: #1a1a2e;
   --primary: #7c3aed;
   --primary-foreground: #ffffff;
-  --secondary: #f0f0f8;
+  --secondary: #edeef5;
   --secondary-foreground: #1a1a2e;
-  --muted: #f0f0f8;
+  --muted: #edeef5;
   --muted-foreground: #6b7280;
-  --accent: #f0f0f8;
+  --accent: #edeef5;
   --accent-foreground: #1a1a2e;
   --destructive: #ef4444;
-  --border: rgba(0, 0, 0, 0.07);
-  --input: rgba(0, 0, 0, 0.05);
+  --border: rgba(0, 0, 0, 0.08);
+  --input: rgba(0, 0, 0, 0.06);
   --ring: #7c3aed;
   --chart-1: #7c3aed;
   --chart-2: #06b6d4;
@@ -78,16 +78,16 @@
   --sidebar-border: rgba(0, 0, 0, 0.06);
   --sidebar-ring: #7c3aed;
 
-  /* Custom semantic tokens */
+  /* Custom semantic tokens for light mode — soft, premium feel */
   --surface-primary: #ffffff;
-  --surface-secondary: #f5f5fb;
+  --surface-secondary: #f7f7fc;
   --surface-tertiary: #eeeef5;
   --text-primary: #1a1a2e;
   --text-secondary: #4b5563;
   --text-tertiary: #9ca3af;
   --text-inverse: #ffffff;
   --border-subtle: rgba(0, 0, 0, 0.04);
-  --border-medium: rgba(0, 0, 0, 0.07);
+  --border-medium: rgba(0, 0, 0, 0.08);
   --glow-color: rgba(124, 58, 237, 0.1);
   --code-bg: rgba(124, 58, 237, 0.06);
   --code-text: #6d28d9;
@@ -97,21 +97,21 @@
   --selection-text: #1a1a2e;
 }
 
-/* ─── Dark Mode — x.ai inspired deep black ─────────────── */
+/* ─── Dark Mode ───────────────────────────────────────────── */
 .dark {
-  --background: #000000;
+  --background: #09090f;
   --foreground: #f4f4f5;
-  --card: #0a0a12;
+  --card: #0c0c14;
   --card-foreground: #f4f4f5;
-  --popover: #0a0a12;
+  --popover: #0c0c14;
   --popover-foreground: #f4f4f5;
   --primary: #a78bfa;
-  --primary-foreground: #000000;
-  --secondary: #111122;
+  --primary-foreground: #09090f;
+  --secondary: #16162b;
   --secondary-foreground: #f4f4f5;
-  --muted: #111122;
+  --muted: #16162b;
   --muted-foreground: #a1a1aa;
-  --accent: #111122;
+  --accent: #16162b;
   --accent-foreground: #f4f4f5;
   --destructive: #ef4444;
   --border: rgba(255, 255, 255, 0.06);
@@ -122,25 +122,25 @@
   --chart-3: #f472b6;
   --chart-4: #34d399;
   --chart-5: #fbbf24;
-  --sidebar: #0a0a12;
+  --sidebar: #0c0c14;
   --sidebar-foreground: #f4f4f5;
   --sidebar-primary: #a78bfa;
-  --sidebar-primary-foreground: #000000;
+  --sidebar-primary-foreground: #09090f;
   --sidebar-accent: rgba(255, 255, 255, 0.04);
   --sidebar-accent-foreground: #f4f4f5;
   --sidebar-border: rgba(255, 255, 255, 0.06);
   --sidebar-ring: #a78bfa;
 
-  /* Custom semantic tokens — x.ai deep black */
-  --surface-primary: #0a0a12;
-  --surface-secondary: #0e0e1a;
-  --surface-tertiary: #15152a;
+  /* Custom semantic tokens */
+  --surface-primary: #0c0c14;
+  --surface-secondary: #111122;
+  --surface-tertiary: #16162b;
   --text-primary: #f4f4f5;
   --text-secondary: #a1a1aa;
   --text-tertiary: #71717a;
-  --text-inverse: #000000;
+  --text-inverse: #09090f;
   --border-subtle: rgba(255, 255, 255, 0.04);
-  --border-medium: rgba(255, 255, 255, 0.07);
+  --border-medium: rgba(255, 255, 255, 0.08);
   --glow-color: rgba(139, 92, 246, 0.15);
   --code-bg: rgba(255, 255, 255, 0.06);
   --code-text: #67e8f9;
@@ -419,40 +419,69 @@
   font-size: 0.75rem;
 }
 
-/* ===== Chat input container — x.ai style ===== */
-.chat-input-container {
+/* ===== Input glow effect ===== */
+.input-glow {
   position: relative;
 }
 
-.chat-input-container::before {
+.input-glow::before {
   content: '';
   position: absolute;
   inset: -1px;
   border-radius: inherit;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(6, 182, 212, 0.3), rgba(139, 92, 246, 0.1));
+  background: linear-gradient(135deg, var(--primary), #22d3ee, var(--primary));
   background-size: 200% 200%;
-  animation: gradient-border 4s ease infinite;
+  animation: gradient-border 3s ease infinite;
   opacity: 0;
-  transition: opacity 0.4s ease;
+  transition: opacity 0.3s ease;
   z-index: -1;
 }
 
-.chat-input-container:focus-within::before {
+.input-glow:focus-within::before {
   opacity: 1;
 }
 
 /* ===== Sidebar item active ===== */
 .sidebar-item-active {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(34, 211, 238, 0.06));
-  border-color: rgba(139, 92, 246, 0.15);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(34, 211, 238, 0.08));
+  border-color: rgba(139, 92, 246, 0.2);
 }
 
+/* Light mode sidebar active */
 :root .sidebar-item-active {
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(6, 182, 212, 0.04));
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(6, 182, 212, 0.05));
 }
 
 .dark .sidebar-item-active {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(34, 211, 238, 0.06));
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(34, 211, 238, 0.08));
+}
+
+/* ===== Suggestion card ===== */
+.suggestion-card {
+  position: relative;
+  background: var(--surface-primary);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.suggestion-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(34, 211, 238, 0.3), rgba(139, 92, 246, 0.1));
+  background-size: 200% 200%;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  animation: gradient-border 3s ease infinite;
+}
+
+.suggestion-card:hover::before {
+  opacity: 1;
 }
 
 /* ===== Code block container — theme-aware ===== */
@@ -493,9 +522,4 @@
 
 .dark .suggestion-card:hover {
   box-shadow: 0 4px 16px rgba(139, 92, 246, 0.12), 0 2px 4px rgba(0, 0, 0, 0.4);
-}
-
-/* ===== Dark mode — pure black background override ===== */
-.dark .bg-background {
-  background-color: #000000;
 }

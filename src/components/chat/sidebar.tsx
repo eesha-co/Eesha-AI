@@ -121,19 +121,25 @@ export function Sidebar() {
     <>
       <motion.aside
         initial={false}
-        animate={{ width: sidebarOpen ? 260 : 0, opacity: sidebarOpen ? 1 : 0 }}
+        animate={{ width: sidebarOpen ? 280 : 0, opacity: sidebarOpen ? 1 : 0 }}
         transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
         className="relative flex-shrink-0 overflow-hidden border-r border-border bg-sidebar/95 backdrop-blur-xl"
-        style={{ maxWidth: sidebarOpen ? 260 : 0 }}
+        style={{ maxWidth: sidebarOpen ? 280 : 0 }}
       >
-        <div className="flex h-full w-[260px] flex-col">
-          {/* Header — minimal like x.ai */}
-          <div className="flex items-center justify-between px-3 py-3">
-            <div className="flex items-center gap-2">
-              <div className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600/20 to-cyan-600/20 border border-border/50">
-                <img src="/logo-transparent.png" alt="Eesha" className="size-4 object-contain" />
+        <div className="flex h-full w-[280px] flex-col">
+          {/* Header with branding */}
+          <div className="flex items-center justify-between px-4 py-4">
+            <div className="flex items-center gap-2.5">
+              <div className="flex size-7 items-center justify-center rounded-md overflow-hidden">
+                <img src="/logo-transparent.png" alt="Eesha AI" className="size-5 object-contain" />
               </div>
-              <span className="text-sm font-semibold text-foreground">Eesha AI</span>
+              <div>
+                <span className="block text-sm font-bold text-foreground">Eesha AI</span>
+                <span className="flex items-center gap-1 text-[10px] text-[var(--text-tertiary)]">
+                  <Zap className="size-2.5 text-amber-500" />
+                  Advanced AI Model
+                </span>
+              </div>
             </div>
             <Button
               variant="ghost"
@@ -146,10 +152,10 @@ export function Sidebar() {
           </div>
 
           {/* New Chat button */}
-          <div className="px-3 pb-2">
+          <div className="px-3 pb-3">
             <Button
               onClick={handleNewChat}
-              className="group w-full justify-start gap-2 rounded-xl border border-border/50 bg-[var(--surface-secondary)] py-2 text-sm text-foreground transition-all duration-200 hover:bg-[var(--surface-tertiary)] hover:border-primary/15 hover:shadow-md hover:shadow-primary/5"
+              className="group w-full justify-start gap-2.5 rounded-xl border border-border bg-gradient-to-r from-violet-600/10 to-cyan-600/10 py-2.5 text-sm text-foreground transition-all duration-200 hover:from-violet-600/20 hover:to-cyan-600/20 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5"
               variant="ghost"
             >
               <Plus className="size-4 transition-transform group-hover:rotate-90 duration-200" />
@@ -158,15 +164,15 @@ export function Sidebar() {
           </div>
 
           {/* Search */}
-          <div className="px-3 pb-2">
+          <div className="px-3 pb-3">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[var(--text-tertiary)]" />
               <input
                 type="text"
-                placeholder="Search..."
+                placeholder="Search conversations..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-border/50 bg-[var(--surface-secondary)] py-1.5 pl-8 pr-8 text-xs text-foreground placeholder-[var(--text-tertiary)] outline-none transition-all focus:border-primary/25 focus:bg-[var(--surface-tertiary)]"
+                className="w-full rounded-lg border border-border bg-[var(--surface-secondary)] py-2 pl-8 pr-8 text-xs text-foreground placeholder-[var(--text-tertiary)] outline-none transition-all focus:border-primary/30 focus:bg-[var(--surface-tertiary)] focus:shadow-sm focus:shadow-primary/5"
               />
               {searchQuery && (
                 <button
@@ -183,8 +189,8 @@ export function Sidebar() {
           <ScrollArea className="flex-1 px-2">
             <div className="py-1">
               {grouped.map((group) => (
-                <div key={group.label} className="mb-2">
-                  <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]/60">
+                <div key={group.label} className="mb-3">
+                  <div className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
                     {group.label}
                   </div>
                   {group.conversations.map((conv) => (
@@ -196,14 +202,14 @@ export function Sidebar() {
                     >
                       <button
                         onClick={() => setActiveConversation(conv.id)}
-                        className={`group relative flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] transition-all duration-150 ${
+                        className={`group relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-sm transition-all duration-150 ${
                           activeConversationId === conv.id
                             ? 'sidebar-item-active text-foreground shadow-sm shadow-primary/5'
                             : 'text-[var(--text-secondary)] hover:bg-accent hover:text-foreground'
                         }`}
                       >
-                        <MessageSquare className="size-3.5 shrink-0 opacity-30" />
-                        <span className="flex-1 truncate">{conv.title}</span>
+                        <MessageSquare className="size-3.5 shrink-0 opacity-40" />
+                        <span className="flex-1 truncate text-[13px]">{conv.title}</span>
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
@@ -220,32 +226,30 @@ export function Sidebar() {
               ))}
               {filteredConversations.length === 0 && (
                 <div className="px-3 py-8 text-center">
-                  <MessageSquare className="mx-auto mb-2 size-6 text-[var(--text-tertiary)]/40" />
+                  <MessageSquare className="mx-auto mb-2 size-8 text-[var(--text-tertiary)]" />
                   <p className="text-xs text-[var(--text-tertiary)]">
-                    {searchQuery ? 'No matches' : 'No conversations yet'}
+                    {searchQuery ? 'No matching conversations' : 'Start a new conversation'}
                   </p>
                 </div>
               )}
             </div>
           </ScrollArea>
 
-          {/* Footer — clean like x.ai */}
-          <div className="border-t border-border px-3 py-2.5">
-            <div className="mb-2">
+          {/* Footer with theme toggle */}
+          <div className="border-t border-border px-3 py-3">
+            <div className="mb-3">
               <ThemeToggle />
             </div>
-            <div className="flex items-center justify-between">
-              <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-[var(--text-tertiary)] transition-colors hover:bg-accent hover:text-foreground">
-                <Settings className="size-3.5" />
-                Settings
-              </button>
-              <div className="flex items-center gap-1.5">
-                <span className="relative flex size-1.5">
-                  <span className="animate-status-pulse absolute inline-flex size-full rounded-full bg-emerald-500 opacity-75" />
-                  <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-                </span>
-                <span className="text-[10px] text-[var(--text-tertiary)]/60">Online</span>
-              </div>
+            <button className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-accent hover:text-foreground">
+              <Settings className="size-4" />
+              Settings
+            </button>
+            <div className="mt-2 flex items-center gap-2 px-2.5">
+              <span className="relative flex size-2">
+                <span className="animate-status-pulse absolute inline-flex size-full rounded-full bg-emerald-500 opacity-75" />
+                <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+              </span>
+              <span className="text-[11px] text-[var(--text-tertiary)]">Eesha AI via NVIDIA API</span>
             </div>
           </div>
         </div>

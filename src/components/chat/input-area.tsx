@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowUp, Square, Paperclip, Globe, Sparkles } from 'lucide-react';
+import { Send, Square, Code2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface InputAreaProps {
@@ -47,19 +47,17 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
   );
 
   return (
-    <div className="shrink-0 px-4 pb-4 pt-2 relative z-10">
-      <div className="mx-auto max-w-[720px]">
-        {/* Input container — x.ai style: rounded, clean, floating */}
-        <div className="chat-input-container relative rounded-2xl border border-border/60 bg-[var(--surface-secondary)]/80 backdrop-blur-xl transition-all duration-300 focus-within:border-primary/25 focus-within:bg-[var(--surface-secondary)] focus-within:shadow-xl focus-within:shadow-primary/5">
+    <div className="shrink-0 border-t border-border bg-gradient-to-t from-background via-background/95 to-background/80 px-4 pb-4 pt-3">
+      <div className="mx-auto max-w-[768px]">
+        {/* Input container */}
+        <div className="input-glow relative rounded-2xl border border-border bg-[var(--surface-secondary)] transition-all duration-300 focus-within:border-primary/30 focus-within:bg-[var(--surface-tertiary)] focus-within:shadow-lg focus-within:shadow-primary/5">
           <div className="flex items-end gap-2 p-3">
-            {/* Left action icons — like x.ai's attach/globe */}
-            <div className="flex items-center gap-1 mb-0.5 shrink-0">
-              <button className="flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground" title="Attach file">
-                <Paperclip className="size-4" />
-              </button>
-              <button className="flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground" title="Web search">
-                <Globe className="size-4" />
-              </button>
+            {/* Model indicator with glow */}
+            <div className="mb-0.5 flex items-center gap-1.5 shrink-0">
+              <div className="relative flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600/20 to-cyan-600/20 border border-border overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-cyan-500/10" />
+                <Code2 className="relative size-3.5 text-primary" />
+              </div>
             </div>
 
             {/* Textarea */}
@@ -68,12 +66,12 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="What do you want to build?"
+              placeholder="Ask Eesha AI to write, debug, or explain code..."
               rows={1}
               className="max-h-[200px] min-h-[28px] flex-1 resize-none bg-transparent text-sm leading-relaxed text-foreground placeholder-[var(--text-tertiary)] outline-none"
             />
 
-            {/* Send / Stop button — arrow-up style like x.ai */}
+            {/* Send / Stop button */}
             <AnimatePresence mode="wait">
               {isStreaming ? (
                 <motion.div
@@ -85,7 +83,7 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
                 >
                   <Button
                     onClick={onStop}
-                    className="size-8 shrink-0 rounded-xl bg-red-500/90 text-white shadow-lg shadow-red-500/20 hover:bg-red-600"
+                    className="size-8 shrink-0 rounded-xl bg-red-600/90 text-white shadow-lg shadow-red-500/20 hover:bg-red-600"
                     size="icon"
                     title="Stop generating"
                   >
@@ -103,11 +101,11 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
                   <Button
                     onClick={handleSubmit}
                     disabled={!input.trim()}
-                    className="size-8 shrink-0 rounded-xl bg-foreground text-background shadow-lg transition-all hover:opacity-90 disabled:opacity-15 disabled:shadow-none"
+                    className="size-8 shrink-0 rounded-xl bg-gradient-to-r from-violet-600 to-cyan-600 text-white shadow-lg shadow-violet-500/20 transition-all hover:shadow-violet-500/40 disabled:opacity-20 disabled:shadow-none"
                     size="icon"
                     title="Send message"
                   >
-                    <ArrowUp className="size-4" />
+                    <Send className="size-3.5" />
                   </Button>
                 </motion.div>
               )}
@@ -115,10 +113,14 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
           </div>
         </div>
 
-        {/* Bottom info — minimal */}
-        <div className="mt-2 flex items-center justify-center px-1">
-          <span className="text-[11px] text-[var(--text-tertiary)]/60">
-            Eesha AI can make mistakes. Review code carefully.
+        {/* Bottom info */}
+        <div className="mt-2 flex items-center justify-between px-1">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="size-3 text-primary/50" />
+            <span className="text-[11px] text-[var(--text-tertiary)]">Eesha AI with Thinking Mode</span>
+          </div>
+          <span className="text-[11px] text-[var(--text-tertiary)]">
+            AI can make mistakes. Review code carefully.
           </span>
         </div>
       </div>

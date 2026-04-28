@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Square, Code2, Sparkles } from 'lucide-react';
+import { Send, Square, Code2, Sparkles, Globe, Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface InputAreaProps {
@@ -13,6 +13,7 @@ interface InputAreaProps {
 
 export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
   const [input, setInput] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const adjustHeight = useCallback(() => {
@@ -47,17 +48,39 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
   );
 
   return (
-    <div className="shrink-0 border-t border-border bg-gradient-to-t from-background via-background/95 to-background/80 px-4 pb-4 pt-3">
+    <div className="shrink-0 px-4 pb-4 pt-2 relative z-10">
       <div className="mx-auto max-w-[768px]">
-        {/* Input container */}
-        <div className="input-glow relative rounded-2xl border border-border bg-[var(--surface-secondary)] transition-all duration-300 focus-within:border-primary/30 focus-within:bg-[var(--surface-tertiary)] focus-within:shadow-lg focus-within:shadow-primary/5">
+        {/* Input container — with animated gradient border */}
+        <motion.div
+          animate={{
+            boxShadow: isFocused
+              ? '0 0 20px rgba(139, 92, 246, 0.08), 0 0 40px rgba(34, 211, 238, 0.04)'
+              : '0 0 0px rgba(139, 92, 246, 0), 0 0 0px rgba(34, 211, 238, 0)',
+          }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+          className="input-glow relative rounded-2xl border border-border bg-[var(--surface-secondary)] transition-all duration-300 focus-within:border-primary/30 focus-within:bg-[var(--surface-tertiary)]"
+        >
           <div className="flex items-end gap-2 p-3">
             {/* Model indicator with glow */}
             <div className="mb-0.5 flex items-center gap-1.5 shrink-0">
-              <div className="relative flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600/20 to-cyan-600/20 border border-border overflow-hidden">
+              <motion.div
+                animate={{ rotate: isStreaming ? 360 : 0 }}
+                transition={{ duration: 2, repeat: isStreaming ? Infinity : 0, ease: 'linear' }}
+                className="relative flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600/20 to-cyan-600/20 border border-border overflow-hidden"
+              >
                 <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-cyan-500/10" />
                 <Code2 className="relative size-3.5 text-primary" />
-              </div>
+              </motion.div>
+            </div>
+
+            {/* Left action buttons */}
+            <div className="flex items-center gap-0.5 mb-0.5 shrink-0">
+              <button className="flex size-6 items-center justify-center rounded-md text-muted-foreground/50 transition-all hover:bg-accent hover:text-foreground" title="Attach file">
+                <Paperclip className="size-3.5" />
+              </button>
+              <button className="flex size-6 items-center justify-center rounded-md text-muted-foreground/50 transition-all hover:bg-accent hover:text-foreground" title="Web search">
+                <Globe className="size-3.5" />
+              </button>
             </div>
 
             {/* Textarea */}
@@ -66,6 +89,8 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
               placeholder="Ask Eesha AI to write, debug, or explain code..."
               rows={1}
               className="max-h-[200px] min-h-[28px] flex-1 resize-none bg-transparent text-sm leading-relaxed text-foreground placeholder-[var(--text-tertiary)] outline-none"
@@ -111,7 +136,7 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
               )}
             </AnimatePresence>
           </div>
-        </div>
+        </motion.div>
 
         {/* Bottom info */}
         <div className="mt-2 flex items-center justify-between px-1">

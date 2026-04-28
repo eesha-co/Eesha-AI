@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Code2, Zap, Globe, BookOpen, Rocket, Lightbulb } from 'lucide-react';
+import { Code2, Zap, Globe, BookOpen, Rocket, Lightbulb, Cpu, GitBranch } from 'lucide-react';
 
 interface EmptyStateProps {
   onSuggestionClick?: (text: string) => void;
@@ -49,35 +49,12 @@ const suggestions = [
 export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-4 py-8 relative z-10">
-      {/* Animated Logo with Glow */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="relative mb-8"
-      >
-        {/* Outer glow ring */}
-        <div className="absolute inset-0 -m-6 rounded-full animate-glow-pulse" />
-
-        {/* Pulsing glow behind logo */}
-        <div className="absolute inset-0 -m-4 rounded-full bg-gradient-to-br from-violet-500/20 via-transparent to-cyan-500/20 blur-xl animate-breathe" />
-
-        {/* Logo container */}
-        <div className="relative flex size-20 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600/10 to-cyan-600/10 border border-border backdrop-blur-sm">
-          <img
-            src="/logo-transparent.png"
-            alt="Eesha AI"
-            className="size-14 object-contain animate-subtle-float"
-          />
-        </div>
-      </motion.div>
-
-      {/* Headline */}
+      {/* Greeting — the logo watermark is visible in the background behind this */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.15 }}
-        className="text-center mb-8"
+        transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+        className="text-center mb-6"
       >
         <h2 className="text-2xl sm:text-3xl font-light text-foreground/90 mb-2">
           What do you want to build?
@@ -85,6 +62,23 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
         <p className="text-sm text-[var(--text-tertiary)] max-w-md mx-auto">
           Eesha AI can write, debug, and deploy code. Ask anything — from quick scripts to full applications.
         </p>
+      </motion.div>
+
+      {/* Model badge — like z.ai's feature chips */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4, delay: 0.2 }}
+        className="mb-8 flex items-center gap-2 rounded-full border border-border/50 bg-[var(--surface-secondary)]/60 backdrop-blur-sm px-4 py-1.5"
+      >
+        <Cpu className="size-3 text-cyan-500" />
+        <span className="text-xs text-[var(--text-tertiary)]">Kimi K2.5</span>
+        <span className="text-[var(--text-tertiary)]/30">|</span>
+        <GitBranch className="size-3 text-violet-500" />
+        <span className="text-xs text-[var(--text-tertiary)]">Thinking Mode</span>
+        <span className="text-[var(--text-tertiary)]/30">|</span>
+        <Rocket className="size-3 text-primary/60" />
+        <span className="text-xs text-[var(--text-tertiary)]">NVIDIA H100s</span>
       </motion.div>
 
       {/* Suggestion Cards */}

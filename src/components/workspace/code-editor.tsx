@@ -57,32 +57,9 @@ export function CodeEditor() {
 
   if (openFiles.length === 0) {
     return (
-      <div className="relative flex h-full flex-col items-center justify-center bg-white/20 dark:bg-black/20 backdrop-blur-sm text-muted-foreground overflow-hidden">
-        {/* Large centered background logo watermark — same style as terminal */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <img
-            src="/logo-transparent.png"
-            alt=""
-            className="object-contain animate-breathe-slow select-none"
-            style={{
-              maxWidth: '60%',
-              maxHeight: '60%',
-              opacity: 0.07,
-              filter: 'brightness(1.4) saturate(1.3)',
-            }}
-          />
-        </div>
-        {/* Centered content overlays the logo */}
-        <div className="relative z-10 flex flex-col items-center gap-4">
-          <div className="relative">
-            <img
-              src="/logo-transparent.png"
-              alt="Eesha AI"
-              className="size-28 object-contain drop-shadow-lg"
-              style={{ filter: 'brightness(1.1) saturate(1.2)' }}
-            />
-            <div className="absolute inset-0 rounded-full animate-glow-pulse opacity-60" />
-          </div>
+      <div className="flex h-full flex-col items-center justify-center bg-white/20 dark:bg-black/20 backdrop-blur-sm text-muted-foreground">
+        {/* No logo here — SmokyBackground canvas provides the background logo */}
+        <div className="flex flex-col items-center gap-3">
           <div className="text-center">
             <h2 className="text-xl font-semibold bg-gradient-to-r from-violet-500 via-cyan-400 to-violet-500 bg-clip-text text-transparent">
               Eesha AI
@@ -99,7 +76,7 @@ export function CodeEditor() {
   const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
 
   return (
-    <div className="relative flex h-full flex-col bg-white/50 dark:bg-black/40 backdrop-blur-sm">
+    <div className="flex h-full flex-col bg-white/50 dark:bg-black/40 backdrop-blur-sm">
       {/* Tab bar */}
       <div className="flex items-center border-b border-border bg-[var(--surface-secondary)] shrink-0">
         <div className="flex flex-1 overflow-x-auto">
@@ -151,25 +128,10 @@ export function CodeEditor() {
         </div>
       )}
 
-      {/* Editor area — with persistent logo watermark in background */}
+      {/* Editor area — no duplicate logo, canvas provides it */}
       {activeFile && (
         <div className="relative flex-1 min-h-0">
-          {/* Background logo watermark — always visible behind code */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <img
-              src="/logo-transparent.png"
-              alt=""
-              className="object-contain animate-breathe-slow select-none"
-              style={{
-                maxWidth: '60%',
-                maxHeight: '60%',
-                opacity: 0.07,
-                filter: 'brightness(1.4) saturate(1.3)',
-              }}
-            />
-          </div>
-          {/* Code content overlays the logo */}
-          <div className="absolute inset-0 flex overflow-hidden relative z-10">
+          <div className="absolute inset-0 flex overflow-hidden">
             {/* Line numbers */}
             <div className="w-12 select-none overflow-hidden border-r border-border bg-[var(--surface-secondary)] py-3 text-right font-mono text-[11px] leading-[1.6] text-muted-foreground shrink-0">
               {lineNumbers.map((num) => (

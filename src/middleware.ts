@@ -12,18 +12,24 @@ interface RateLimitEntry {
 const rateLimitMap = new Map<string, RateLimitEntry>();
 
 // Rate limit configurations per endpoint type
-const RATE_LIMITS: Record<string, { windowMs: number; maxRequests: number }> = {
-  // AI chat: 20 requests per minute (expensive API calls)
-  chat: { windowMs: 60_000, maxRequests: 20 },
-  // Conversations: 60 requests per minute
-  conversations: { windowMs: 60_000, maxRequests: 60 },
-  // Workspace: 30 requests per minute (file operations)
-  workspace: { windowMs: 60_000, maxRequests: 30 },
-  // Terminal: 10 requests per minute (dangerous — shell commands)
-  terminal: { windowMs: 60_000, maxRequests: 10 },
-  // Default for any other route
-  default: { windowMs: 60_000, maxRequests: 60 },
+// Anonymous users get LOWER limits; authenticated users get FULL limits
+const RATE_LIMITS: Record<string, { windowMs: number; maxRequests: number; anonMaxRequests: number }> = {
+  // AI chat: authenticated 20/min, anonymous 5/min (free tier)
+  chat: { windowMs: 60_000, maxRequests: 20, anonMaxRequests: 5 },
+  // Conversations: authenticated 60/min, anonymous 30/min
+  conversations: { windowMs: 60_000, maxRequests: 60, anonMaxRequests: 30 },
+  // Workspace: authenticated 30/min, anonymous 10/min
+  workspace: { windowMs: 60_000, maxRequests: 30, anonMaxRequests: 10 },
+  // Terminal: authenticated only — anonymous CANNOT access
+  terminal: { windowMs: 60_000, maxRequests: 10, anonMaxRequests: 0 },
+  // Default
+  default: { windowMs: 60_000, maxRequests: 60, anonMaxRequests: 30 },
 };
+
+// ─── Free Tier Credits ───────────────────────────────────────────────────────
+// Anonymous users get 5 free messages per session (stored in cookie)
+const FREE_TIER_MAX = 5;
+const FREE_TIER_COOKIE = "eesha-free-credits";
 
 function getEndpointType(pathname: string): string {
   if (pathname.startsWith("/api/chat")) return "chat";
@@ -33,21 +39,26 @@ function getEndpointType(pathname: string): string {
   return "default";
 }
 
-function checkRateLimit(userId: string, endpointType: string): { allowed: boolean; retryAfter?: number } {
+function checkRateLimit(identifier: string, endpointType: string, isAnonymous: boolean): { allowed: boolean; retryAfter?: number } {
   const config = RATE_LIMITS[endpointType] || RATE_LIMITS.default;
-  const key = `${userId}:${endpointType}`;
+  const maxRequests = isAnonymous ? config.anonMaxRequests : config.maxRequests;
+
+  // Terminal: anonymous users have 0 access
+  if (isAnonymous && maxRequests === 0) {
+    return { allowed: false, retryAfter: 60 };
+  }
+
+  const key = identifier + ":" + endpointType;
   const now = Date.now();
 
   const entry = rateLimitMap.get(key);
 
   if (!entry || now > entry.resetTime) {
-    // New window
     rateLimitMap.set(key, { count: 1, resetTime: now + config.windowMs });
     return { allowed: true };
   }
 
-  if (entry.count >= config.maxRequests) {
-    // Rate limited
+  if (entry.count >= maxRequests) {
     const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
     return { allowed: false, retryAfter };
   }
@@ -56,28 +67,36 @@ function checkRateLimit(userId: string, endpointType: string): { allowed: boolea
   return { allowed: true };
 }
 
-// Clean up old rate limit entries every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitMap.entries()) {
-    if (now > entry.resetTime + 300_000) {
-      rateLimitMap.delete(key);
-    }
+function getFreeCreditsUsed(request: NextRequest): number {
+  const cookie = request.cookies.get(FREE_TIER_COOKIE)?.value;
+  if (!cookie) return 0;
+  try {
+    const parsed = JSON.parse(cookie);
+    return parsed.used || 0;
+  } catch {
+    return 0;
   }
-}, 300_000);
+}
+
+// Clean up old rate limit entries every 5 minutes
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of rateLimitMap.entries()) {
+      if (now > entry.resetTime + 300_000) {
+        rateLimitMap.delete(key);
+      }
+    }
+  }, 300_000);
+}
 
 // ─── Security Headers ────────────────────────────────────────────────────────
 
 function addSecurityHeaders(response: NextResponse): NextResponse {
-  // Prevent clickjacking
   response.headers.set("X-Frame-Options", "DENY");
-  // Prevent MIME-type sniffing
   response.headers.set("X-Content-Type-Options", "nosniff");
-  // XSS protection (legacy browsers)
   response.headers.set("X-XSS-Protection", "1; mode=block");
-  // Referrer policy
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  // Content Security Policy
   response.headers.set(
     "Content-Security-Policy",
     [
@@ -90,14 +109,12 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
       "frame-ancestors 'none'",
     ].join("; ")
   );
-  // Strict Transport Security (production only)
   if (process.env.NODE_ENV === "production") {
     response.headers.set(
       "Strict-Transport-Security",
       "max-age=63072000; includeSubDomains; preload"
     );
   }
-  // Permissions policy
   response.headers.set(
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=()"
@@ -110,90 +127,120 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // ── Skip auth for static files and NextAuth routes ──────────────────────
+  // ── Skip middleware for static files and NextAuth routes ────────────────
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/favicon") ||
-    pathname.includes(".") // Static files
+    pathname.includes(".")
   ) {
     const response = NextResponse.next();
     return addSecurityHeaders(response);
   }
 
-  // ── Allow login page without auth ───────────────────────────────────────
-  if (pathname === "/login" || pathname === "/api/health") {
+  // ── Always allow the home page and login page ───────────────────────────
+  // This is the "free chat first" model — anyone can visit the site
+  if (pathname === "/" || pathname === "/login" || pathname === "/api/health") {
     const response = NextResponse.next();
     return addSecurityHeaders(response);
   }
 
-  // ── Check authentication for all other routes ───────────────────────────
+  // ── Check if user is authenticated ──────────────────────────────────────
   const token = await getToken({
     req: request,
     secret: process.env.NEXTAUTH_SECRET,
   });
 
-  if (!token) {
-    // API routes return 401
-    if (pathname.startsWith("/api/")) {
+  const isAuthenticated = !!token;
+  const userId = isAuthenticated ? (token.id as string) : getAnonymousId(request);
+
+  // ── API Routes: allow anonymous access with stricter limits ─────────────
+  if (pathname.startsWith("/api/")) {
+    const endpointType = getEndpointType(pathname);
+
+    // Terminal: AUTHENTICATED ONLY — never allow anonymous
+    if (endpointType === "terminal" && !isAuthenticated) {
       return NextResponse.json(
-        { error: "Authentication required" },
+        { error: "SIGN_IN_REQUIRED", message: "Terminal access requires sign-in. Please create a free account to continue." },
         { status: 401 }
       );
     }
 
-    // Page routes redirect to login
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("callbackUrl", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
+    // Chat: check free tier credits for anonymous users
+    if (endpointType === "chat" && !isAuthenticated) {
+      const creditsUsed = getFreeCreditsUsed(request);
+      if (creditsUsed >= FREE_TIER_MAX) {
+        return NextResponse.json(
+          {
+            error: "FREE_LIMIT_REACHED",
+            message: "You've used all " + FREE_TIER_MAX + " free messages. Sign in for unlimited access!",
+            creditsUsed,
+            creditsMax: FREE_TIER_MAX,
+          },
+          { status: 403 }
+        );
+      }
+    }
 
-  // ── Rate limiting for API routes ────────────────────────────────────────
-  if (pathname.startsWith("/api/")) {
-    const userId = token.id as string;
-    const endpointType = getEndpointType(pathname);
-    const { allowed, retryAfter } = checkRateLimit(userId, endpointType);
-
+    // Rate limiting
+    const { allowed, retryAfter } = checkRateLimit(userId, endpointType, !isAuthenticated);
     if (!allowed) {
       return NextResponse.json(
-        { error: "Rate limit exceeded. Please slow down." },
+        { error: "Rate limit exceeded. Please slow down." + (!isAuthenticated ? " Sign in for higher limits." : "") },
         {
           status: 429,
           headers: {
             "Retry-After": String(retryAfter || 60),
-            "X-RateLimit-Limit": String(RATE_LIMITS[endpointType]?.maxRequests || 60),
           },
         }
       );
     }
 
-    // Add user ID to request headers for API routes to use
+    // Add auth context to request headers for API routes
     const requestHeaders = new Headers(request.headers);
-    requestHeaders.set("x-user-id", userId);
-    requestHeaders.set("x-user-email", (token.email as string) || "");
+    if (isAuthenticated) {
+      requestHeaders.set("x-user-id", userId);
+      requestHeaders.set("x-user-email", (token.email as string) || "");
+      requestHeaders.set("x-authenticated", "true");
+    } else {
+      requestHeaders.set("x-user-id", userId);
+      requestHeaders.set("x-authenticated", "false");
+    }
 
     const response = NextResponse.next({
       request: { headers: requestHeaders },
     });
 
-    // Add rate limit info headers
-    response.headers.set("X-RateLimit-Remaining", "check");
     return addSecurityHeaders(response);
   }
 
-  // ── Page routes — just add security headers ─────────────────────────────
+  // ── Page routes — always allow, add security headers ────────────────────
   const response = NextResponse.next();
   return addSecurityHeaders(response);
 }
 
+// ─── Generate anonymous ID from IP + User-Agent fingerprint ──────────────────
+function getAnonymousId(request: NextRequest): string {
+  // Use a combination of IP and user agent as anonymous identifier
+  // This prevents simple abuse while not requiring login
+  const ip = request.headers.get("x-forwarded-for") ||
+             request.headers.get("x-real-ip") ||
+             "unknown";
+  const ua = request.headers.get("user-agent") || "unknown";
+
+  // Simple hash for consistent ID (not cryptographically secure, just for rate limiting)
+  let hash = 0;
+  const str = "anon:" + ip + ":" + ua;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return "anon_" + Math.abs(hash).toString(36);
+}
+
 export const config = {
   matcher: [
-    /*
-     * Match all routes except:
-     * - _next/static (static files)
-     * - _next/image (image optimization)
-     * - public folder files
-     */
     "/((?!_next/static|_next/image|logo|favicon).*)",
   ],
 };

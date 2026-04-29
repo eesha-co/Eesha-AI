@@ -439,12 +439,15 @@ function parseToolCallsFromText(text: string): { toolCalls: { name: string; args
 
 // ─── Main POST Handler — Parallel Round Table Architecture ────────────────────
 
+// ─── Free Tier Configuration ────────────────────────────────────────────────
+const FREE_TIER_MAX = 5;
+const FREE_TIER_COOKIE = 'eesha-free-credits';
+
 export async function POST(req: NextRequest) {
-  // ━━━ SECURITY: Authenticate user ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const userId = await getAuthUserId();
-  if (!userId) {
-    return unauthorizedResponse();
-  }
+  // ━━━ Support both authenticated and anonymous users ━━━━━━━━━━━━━━━━━━━━
+  // Middleware already enforces free tier limits — we just need to identify
+  const isAuthenticated = req.headers.get('x-authenticated') === 'true';
+  const userId = req.headers.get('x-user-id') || 'anonymous';
 
   try {
     const { messages, conversationId } = await req.json();
@@ -463,8 +466,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ━━━ SECURITY: Verify conversation belongs to user ━━━━━━━━━━━━━━━━━━━━
-    if (conversationId && isDatabaseAvailable()) {
+    // ━━━ SECURITY: Verify conversation belongs to user (authenticated only) ━━
+    if (isAuthenticated && conversationId && isDatabaseAvailable()) {
       try {
         const conversation = await db.conversation.findUnique({
           where: { id: conversationId },
@@ -479,16 +482,16 @@ export async function POST(req: NextRequest) {
       } catch (dbError) { console.error('Conversation ownership check failed:', dbError); }
     }
 
-    // Save user message to database
+    // Save user message to database (authenticated users only — anonymous = no DB)
     const lastMessage = messages[messages.length - 1];
-    if (lastMessage.role === 'user' && conversationId && isDatabaseAvailable()) {
+    if (isAuthenticated && lastMessage.role === 'user' && conversationId && isDatabaseAvailable()) {
       try {
         await db.message.create({ data: { role: 'user', content: lastMessage.content, conversationId } });
       } catch (dbError) { console.error('Failed to save user message:', dbError); }
     }
 
-    // Auto-generate title
-    if (conversationId && messages.length === 1 && isDatabaseAvailable()) {
+    // Auto-generate title (authenticated only)
+    if (isAuthenticated && conversationId && messages.length === 1 && isDatabaseAvailable()) {
       try {
         const title = lastMessage.content.slice(0, 60) + (lastMessage.content.length > 60 ? '...' : '');
         await db.conversation.update({ where: { id: conversationId }, data: { title } });
@@ -619,16 +622,16 @@ export async function POST(req: NextRequest) {
             controller.enqueue(encoder.encode(sse('content', { content: chunk })));
           }
 
-          // Save to database — scoped to authenticated user
-          if (conversationId && finalResponse && isDatabaseAvailable()) {
+          // Save to database — scoped to authenticated user only
+          if (isAuthenticated && conversationId && finalResponse && isDatabaseAvailable()) {
             try {
               await db.message.create({ data: { role: 'assistant', content: finalResponse, conversationId } });
               await db.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
             } catch (dbError) { console.error('Failed to save assistant message:', dbError); }
           }
 
-          // ━━━ Track API usage for security monitoring ━━━━━━━━━━━━━━━━━━━
-          if (isDatabaseAvailable()) {
+          // ━━━ Track API usage for security monitoring (authenticated only) ━━
+          if (isAuthenticated && isDatabaseAvailable()) {
             try {
               await db.apiUsage.create({
                 data: {

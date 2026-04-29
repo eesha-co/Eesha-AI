@@ -28,12 +28,17 @@ interface ChatState {
   isStreaming: boolean;
   sidebarOpen: boolean;
   themeMode: ThemeMode;
+  freeCreditsUsed: number; // Track anonymous free messages
+  showLoginPrompt: boolean; // Show login prompt modal
 
   setConversations: (conversations: Conversation[]) => void;
   setActiveConversation: (id: string | null) => void;
   setIsStreaming: (streaming: boolean) => void;
   setSidebarOpen: (open: boolean) => void;
   setThemeMode: (mode: ThemeMode) => void;
+  setFreeCreditsUsed: (used: number) => void;
+  incrementFreeCredits: () => void;
+  setShowLoginPrompt: (show: boolean) => void;
 
   addConversation: (conversation: Conversation) => void;
   deleteConversation: (id: string) => void;
@@ -84,6 +89,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isStreaming: false,
   sidebarOpen: true,
   themeMode: getInitialTheme(),
+  freeCreditsUsed: 0,
+  showLoginPrompt: false,
 
   setConversations: (conversations) => set({ conversations }),
   setActiveConversation: (id) => set({ activeConversationId: id }),
@@ -94,6 +101,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     applyTheme(mode);
     set({ themeMode: mode });
   },
+
+  setFreeCreditsUsed: (used) => set({ freeCreditsUsed: used }),
+  incrementFreeCredits: () => set((state) => ({ freeCreditsUsed: state.freeCreditsUsed + 1 })),
+  setShowLoginPrompt: (show) => set({ showLoginPrompt: show }),
 
   addConversation: (conversation) =>
     set((state) => ({

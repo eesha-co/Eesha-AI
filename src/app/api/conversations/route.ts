@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, isDatabaseAvailable } from '@/lib/db';
-import { getAuthUserId, unauthorizedResponse } from '@/lib/api-auth';
+import { getAuthUserId } from '@/lib/api-auth';
 
 export async function GET() {
-  // ━━━ SECURITY: Authenticate user ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const userId = await getAuthUserId();
+
+  // Anonymous users get empty conversation list (stored in memory only)
   if (!userId) {
-    return unauthorizedResponse();
+    return NextResponse.json([]);
   }
 
   if (!isDatabaseAvailable()) {
     return NextResponse.json([]);
   }
   try {
-    // ━━━ SECURITY: Only fetch conversations belonging to this user ━━━━━━━━
     const conversations = await db.conversation.findMany({
       where: { userId },
       orderBy: { updatedAt: 'desc' },
@@ -27,33 +27,39 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  // ━━━ SECURITY: Authenticate user ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const userId = await getAuthUserId();
+
+  // Anonymous users get a temporary local-only conversation (no DB save)
   if (!userId) {
-    return unauthorizedResponse();
+    return NextResponse.json({
+      id: 'anon-' + Date.now(),
+      title: 'New Chat',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messages: [],
+      _anonymous: true,
+    });
   }
 
   if (!isDatabaseAvailable()) {
-    return NextResponse.json({ id: 'temp-' + Date.now(), title: 'New Chat', createdAt: new Date(), updatedAt: new Date(), messages: [] });
+    return NextResponse.json({ id: 'temp-' + Date.now(), title: 'New Chat', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), messages: [] });
   }
   try {
     const { title } = await req.json();
-    // ━━━ SECURITY: Associate conversation with authenticated user ━━━━━━━━
     const conversation = await db.conversation.create({
       data: { title: title || 'New Chat', userId },
     });
     return NextResponse.json(conversation);
   } catch (error) {
     console.error('Failed to create conversation:', error);
-    return NextResponse.json({ id: 'temp-' + Date.now(), title: 'New Chat', createdAt: new Date(), updatedAt: new Date(), messages: [] });
+    return NextResponse.json({ id: 'temp-' + Date.now(), title: 'New Chat', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), messages: [] });
   }
 }
 
 export async function PUT(req: NextRequest) {
-  // ━━━ SECURITY: Authenticate user ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const userId = await getAuthUserId();
   if (!userId) {
-    return unauthorizedResponse();
+    return NextResponse.json({ success: true });
   }
 
   if (!isDatabaseAvailable()) {
@@ -63,7 +69,6 @@ export async function PUT(req: NextRequest) {
     const { id, title } = await req.json();
     if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
 
-    // ━━━ SECURITY: Verify ownership before updating ━━━━━━━━━━━━━━━━━━━━━
     const conversation = await db.conversation.findUnique({ where: { id }, select: { userId: true } });
     if (!conversation || conversation.userId !== userId) {
       return NextResponse.json({ error: 'Access denied.' }, { status: 403 });
@@ -81,10 +86,9 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  // ━━━ SECURITY: Authenticate user ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const userId = await getAuthUserId();
   if (!userId) {
-    return unauthorizedResponse();
+    return NextResponse.json({ success: true });
   }
 
   if (!isDatabaseAvailable()) {
@@ -94,7 +98,6 @@ export async function DELETE(req: NextRequest) {
     const { id } = await req.json();
     if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
 
-    // ━━━ SECURITY: Verify ownership before deleting ━━━━━━━━━━━━━━━━━━━━━
     const conversation = await db.conversation.findUnique({ where: { id }, select: { userId: true } });
     if (!conversation || conversation.userId !== userId) {
       return NextResponse.json({ error: 'Access denied.' }, { status: 403 });

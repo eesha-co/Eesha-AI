@@ -87,6 +87,26 @@ export function useChat() {
 
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
+
+          // ── Handle free tier limit reached ────────────────────────────
+          if (errData.error === 'FREE_LIMIT_REACHED') {
+            setDeliberating(conversationId, false);
+            updateLastAssistantMessage(
+              conversationId,
+              `You've used all ${errData.creditsMax || 5} free messages! 🎉\n\nSign in to get **unlimited access** to Eesha AI:\n- Unlimited chat messages\n- Workspace & file management\n- Terminal access\n- Conversation history saved\n\n[Click here to sign in →](/login)`
+            );
+            setIsStreaming(false);
+            resetAgentStatuses(conversationId);
+            setError('FREE_LIMIT_REACHED');
+            return;
+          }
+
+          // ── Handle terminal requires auth ─────────────────────────────
+          if (errData.error === 'SIGN_IN_REQUIRED') {
+            setError('Sign in required for this feature.');
+            return;
+          }
+
           throw new Error(errData.error || `HTTP ${response.status}`);
         }
 

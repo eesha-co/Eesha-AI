@@ -5,7 +5,7 @@ import path from 'path';
 import { exec } from 'child_process';
 
 export const runtime = 'nodejs';
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || '/app/workspace';
 
@@ -37,10 +37,54 @@ function runCommand(command: string, cwd?: string): Promise<{ stdout: string; st
 }
 
 const NVIDIA_BASE_URL = process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1';
-const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || '';
-const MODEL_ID = 'moonshotai/kimi-k2.5';
 
-// ─── Tool definitions for native function calling ────────────────────────────
+// ─── Multi-Agent Configuration ────────────────────────────────────────────────
+// API keys are read from environment variables (set as HF Spaces Secrets)
+const AGENT1_API_KEY = process.env.AGENT1_API_KEY || '';
+const AGENT2_API_KEY = process.env.AGENT2_API_KEY || '';
+const AGENT3_API_KEY = process.env.AGENT3_API_KEY || '';
+
+const AGENT1_MODEL = 'qwen/qwen3-coder-480b-a35b-instruct';
+const AGENT2_MODEL = 'moonshotai/kimi-k2-thinking';
+const AGENT3_MODEL = 'mistralai/mistral-large-3-675b-instruct-2512';
+
+const AGENT1_SYSTEM_PROMPT = `You are The Specialist, an expert coding AI agent. You are part of a "Committee of AI" multi-agent system for Eesha AI.
+
+Your role is to generate a thorough, accurate initial response to the user's coding question. Be comprehensive and provide well-structured code solutions with clear explanations. Include edge cases and best practices where relevant. If writing code, make it production-ready with proper error handling.
+
+You are a CODING AGENT — not just a chatbot. When users ask you to build something, you MUST:
+1. Plan your approach briefly
+2. Provide complete, runnable code solutions
+3. Include all necessary imports, setup, and configuration
+4. Consider error handling and edge cases
+5. Follow best practices for the relevant language/framework`;
+
+const AGENT2_SYSTEM_PROMPT = `You are The Critic, a rigorous code reviewer AI agent. You are part of a "Committee of AI" multi-agent system for Eesha AI.
+
+Your role is to review the Specialist's draft answer for:
+- Bugs, logic errors, or incorrect code
+- Security vulnerabilities or performance issues
+- Missing edge cases or error handling
+- Deviations from best practices or coding standards
+- Incomplete solutions or missing imports
+- Any misleading or incorrect explanations
+
+Provide a refined version of the answer that fixes all issues you find. Be specific about what you're changing and why. If the original answer is already excellent, say so and provide minor improvements.`;
+
+const AGENT3_SYSTEM_PROMPT = `You are The Judge, the final decision-maker AI agent. You are part of a "Committee of AI" multi-agent system for Eesha AI.
+
+Your role is to synthesize the original question, the Specialist's draft, and the Critic's review into a final, polished, definitive answer.
+
+Rules:
+- Incorporate valid critiques from the Critic
+- Resolve any disagreements between the Specialist and Critic
+- If the Critic found no issues, polish the Specialist's answer for clarity
+- If the Critic found issues, produce the corrected version
+- Always provide the complete, final answer — never just describe what changed
+- Make the final answer as clear, accurate, and helpful as possible
+- Include complete code blocks where code is needed`;
+
+// ─── Tool definitions for the coding agent functionality ───────────────────────
 const TOOLS = [
   {
     type: 'function' as const,
@@ -132,28 +176,6 @@ const TOOLS = [
   },
 ];
 
-const SYSTEM_PROMPT = `You are Eesha AI, an advanced AI coding agent powered by Kimi K2.5. You are an expert in software engineering across all programming languages and frameworks.
-
-You are a CODING AGENT — not just a chatbot. When users ask you to build something, you MUST:
-1. Plan your approach briefly
-2. Create actual files using the create_file tool
-3. Install dependencies using run_command
-4. Run and test the code using run_command
-5. Fix any errors by editing files with edit_file
-
-CRITICAL RULES:
-- When asked to write code, ALWAYS use create_file to save it to a file. NEVER just output code in your response.
-- When asked to modify code, use edit_file for small changes or create_file to rewrite the whole file.
-- When asked to read existing code, use read_file.
-- When asked to delete files, use delete_file.
-- When asked to run commands, use run_command.
-- After creating or editing files, always run them to verify they work.
-- If there are errors, read the error output and fix the code.
-- Be thorough — create all necessary files for a project to work.
-- Support ANY file type: .py, .js, .ts, .html, .css, .json, .yaml, .md, .sh, .sql, .go, .rs, .java, .rb, .php, .c, .cpp, .swift, .kt, etc.
-
-You have full access to a workspace filesystem. Use it to create real, runnable projects.`;
-
 // ─── Tool execution ──────────────────────────────────────────────────────────
 
 async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
@@ -223,7 +245,295 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
   }
 }
 
-// ─── Fallback: parse ```tool blocks from text ────────────────────────────────
+// ─── SSE Helper ───────────────────────────────────────────────────────────────
+
+function sseEvent(type: string, data: Record<string, unknown>): string {
+  return `data: ${JSON.stringify({ type, ...data })}\n\n`;
+}
+
+// ─── Agent 1: The Specialist (Qwen Coder via OpenAI SDK compatible API) ──────
+
+async function runAgent1Specialist(
+  userMessages: Array<{ role: string; content: string }>,
+  controller: WritableStreamDefaultController,
+  encoder: TextEncoder,
+): Promise<string> {
+  // Send agent status
+  controller.enqueue(encoder.encode(sseEvent('agent_status', { agent: 'specialist', status: 'thinking' })));
+
+  const messages = [
+    { role: 'system', content: AGENT1_SYSTEM_PROMPT },
+    ...userMessages,
+  ];
+
+  const response = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${AGENT1_API_KEY}`,
+      'Accept': 'text/event-stream',
+    },
+    body: JSON.stringify({
+      model: AGENT1_MODEL,
+      messages,
+      temperature: 0.7,
+      top_p: 0.8,
+      max_tokens: 4096,
+      stream: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Agent 1 (Specialist) API error ${response.status}: ${errorText.slice(0, 500)}`);
+    controller.enqueue(encoder.encode(sseEvent('agent_status', { agent: 'specialist', status: 'error' })));
+    return `[Specialist Error: API returned ${response.status}]`;
+  }
+
+  // Send agent status — now generating
+  controller.enqueue(encoder.encode(sseEvent('agent_status', { agent: 'specialist', status: 'generating' })));
+
+  const reader = response.body?.getReader();
+  if (!reader) return '';
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let fullContent = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith('data: ')) continue;
+      const data = trimmed.slice(6);
+      if (data === '[DONE]') continue;
+
+      try {
+        const parsed = JSON.parse(data);
+        const content = parsed.choices?.[0]?.delta?.content;
+        if (content) {
+          fullContent += content;
+          // Stream to frontend with agent label
+          controller.enqueue(encoder.encode(sseEvent('agent_content', {
+            agent: 'specialist',
+            content,
+          })));
+        }
+      } catch { /* skip */ }
+    }
+  }
+
+  controller.enqueue(encoder.encode(sseEvent('agent_status', { agent: 'specialist', status: 'done' })));
+  return fullContent;
+}
+
+// ─── Agent 2: The Critic (Kimi K2 Thinking) ──────────────────────────────────
+
+async function runAgent2Critic(
+  userMessages: Array<{ role: string; content: string }>,
+  specialistDraft: string,
+  controller: WritableStreamDefaultController,
+  encoder: TextEncoder,
+): Promise<{ content: string; reasoning: string }> {
+  // Send agent status
+  controller.enqueue(encoder.encode(sseEvent('agent_status', { agent: 'critic', status: 'thinking' })));
+
+  const userQuestion = userMessages.filter(m => m.role === 'user').map(m => m.content).join('\n');
+
+  const messages = [
+    { role: 'system', content: AGENT2_SYSTEM_PROMPT },
+    {
+      role: 'user',
+      content: `**Original User Question:**\n${userQuestion}\n\n**Specialist's Draft Answer:**\n${specialistDraft}\n\nPlease review the Specialist's draft above. Identify any errors, inefficiencies, missing edge cases, or improvements. Provide your refined version.`,
+    },
+  ];
+
+  const response = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${AGENT2_API_KEY}`,
+      'Accept': 'text/event-stream',
+    },
+    body: JSON.stringify({
+      model: AGENT2_MODEL,
+      messages,
+      temperature: 1,
+      top_p: 0.9,
+      max_tokens: 16384,
+      stream: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Agent 2 (Critic) API error ${response.status}: ${errorText.slice(0, 500)}`);
+    controller.enqueue(encoder.encode(sseEvent('agent_status', { agent: 'critic', status: 'error' })));
+    return { content: `[Critic Error: API returned ${response.status}]`, reasoning: '' };
+  }
+
+  // Send agent status — now generating
+  controller.enqueue(encoder.encode(sseEvent('agent_status', { agent: 'critic', status: 'generating' })));
+
+  const reader = response.body?.getReader();
+  if (!reader) return { content: '', reasoning: '' };
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let fullContent = '';
+  let fullReasoning = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith('data: ')) continue;
+      const data = trimmed.slice(6);
+      if (data === '[DONE]') continue;
+
+      try {
+        const parsed = JSON.parse(data);
+        const choice = parsed.choices?.[0];
+        if (!choice) continue;
+
+        const delta = choice.delta;
+
+        // Capture reasoning_content (chain of thought) — send as thinking to frontend
+        const reasoning = delta?.reasoning_content;
+        if (reasoning) {
+          fullReasoning += reasoning;
+          // Send reasoning as thinking to frontend (collapsible)
+          controller.enqueue(encoder.encode(sseEvent('agent_thinking', {
+            agent: 'critic',
+            content: reasoning,
+          })));
+        }
+
+        // Capture actual content
+        if (delta?.content) {
+          fullContent += delta.content;
+          // Stream to frontend with agent label
+          controller.enqueue(encoder.encode(sseEvent('agent_content', {
+            agent: 'critic',
+            content: delta.content,
+          })));
+        }
+      } catch { /* skip */ }
+    }
+  }
+
+  controller.enqueue(encoder.encode(sseEvent('agent_status', { agent: 'critic', status: 'done' })));
+  return { content: fullContent, reasoning: fullReasoning };
+}
+
+// ─── Agent 3: The Judge (Mistral Large via HTTP requests) ─────────────────────
+
+async function runAgent3Judge(
+  userMessages: Array<{ role: string; content: string }>,
+  specialistDraft: string,
+  criticContent: string,
+  controller: WritableStreamDefaultController,
+  encoder: TextEncoder,
+): Promise<string> {
+  // Send agent status
+  controller.enqueue(encoder.encode(sseEvent('agent_status', { agent: 'judge', status: 'thinking' })));
+
+  const userQuestion = userMessages.filter(m => m.role === 'user').map(m => m.content).join('\n');
+
+  const messages = [
+    { role: 'system', content: AGENT3_SYSTEM_PROMPT },
+    {
+      role: 'user',
+      content: `**Original User Question:**\n${userQuestion}\n\n**Specialist's Draft Answer:**\n${specialistDraft}\n\n**Critic's Review:**\n${criticContent}\n\nBased on the original question, the Specialist's draft, and the Critic's review, produce the final, polished, definitive answer. Incorporate valid critiques and resolve any disagreements.`,
+    },
+  ];
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${AGENT3_API_KEY}`,
+    'Accept': 'text/event-stream',
+  };
+
+  const payload = {
+    model: AGENT3_MODEL,
+    messages,
+    max_tokens: 2048,
+    temperature: 0.15,
+    top_p: 1.00,
+    frequency_penalty: 0.00,
+    presence_penalty: 0.00,
+    stream: true,
+  };
+
+  const response = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Agent 3 (Judge) API error ${response.status}: ${errorText.slice(0, 500)}`);
+    controller.enqueue(encoder.encode(sseEvent('agent_status', { agent: 'judge', status: 'error' })));
+    return `[Judge Error: API returned ${response.status}]`;
+  }
+
+  // Send agent status — now generating
+  controller.enqueue(encoder.encode(sseEvent('agent_status', { agent: 'judge', status: 'generating' })));
+
+  const reader = response.body?.getReader();
+  if (!reader) return '';
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let fullContent = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith('data: ')) continue;
+      const data = trimmed.slice(6);
+      if (data === '[DONE]') continue;
+
+      try {
+        const parsed = JSON.parse(data);
+        const content = parsed.choices?.[0]?.delta?.content;
+        if (content) {
+          fullContent += content;
+          // Stream to frontend with agent label
+          controller.enqueue(encoder.encode(sseEvent('agent_content', {
+            agent: 'judge',
+            content,
+          })));
+        }
+      } catch { /* skip */ }
+    }
+  }
+
+  controller.enqueue(encoder.encode(sseEvent('agent_status', { agent: 'judge', status: 'done' })));
+  return fullContent;
+}
+
+// ─── Tool execution from Agent 1 content ──────────────────────────────────────
 
 function parseToolCallsFromText(text: string): { toolCalls: { name: string; args: Record<string, unknown> }[]; cleanText: string } {
   const toolCalls: { name: string; args: Record<string, unknown> }[] = [];
@@ -264,6 +574,35 @@ function parseToolCallsFromText(text: string): { toolCalls: { name: string; args
   return { toolCalls, cleanText };
 }
 
+// ─── Execute tools from specialist draft and send results to frontend ─────────
+
+async function executeToolsFromDraft(
+  draftContent: string,
+  controller: WritableStreamDefaultController,
+  encoder: TextEncoder,
+): Promise<string> {
+  const { toolCalls, cleanText } = parseToolCallsFromText(draftContent);
+
+  if (toolCalls.length === 0) return cleanText;
+
+  for (const tc of toolCalls) {
+    controller.enqueue(encoder.encode(sseEvent('tool_start', {
+      tool: tc.name,
+      path: (tc.args.path as string) || '',
+      command: (tc.args.command as string) || '',
+    })));
+
+    const result = await executeTool(tc.name, tc.args);
+
+    controller.enqueue(encoder.encode(sseEvent('tool_result', {
+      tool: tc.name,
+      result,
+    })));
+  }
+
+  return cleanText;
+}
+
 // ─── Main POST handler ───────────────────────────────────────────────────────
 
 interface CollectedToolCall {
@@ -283,9 +622,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (!NVIDIA_API_KEY) {
+    if (!AGENT1_API_KEY || !AGENT2_API_KEY || !AGENT3_API_KEY) {
       return new Response(
-        JSON.stringify({ error: 'NVIDIA_API_KEY not configured.' }),
+        JSON.stringify({ error: 'Agent API keys not configured.' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -306,14 +645,11 @@ export async function POST(req: NextRequest) {
       } catch (dbError) { console.error('Failed to update title:', dbError); }
     }
 
-    // Build messages for NVIDIA API
-    const aiMessages: Array<{ role: string; content?: string; tool_calls?: any[]; tool_call_id?: string }> = [
-      { role: 'system', content: SYSTEM_PROMPT },
-      ...messages.map((m: { role: string; content: string }) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-      })),
-    ];
+    // Build user messages array
+    const userMessages: Array<{ role: string; content: string }> = messages.map((m: { role: string; content: string }) => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+    }));
 
     const encoder = new TextEncoder();
     let fullResponse = '';
@@ -321,244 +657,68 @@ export async function POST(req: NextRequest) {
     const readableStream = new ReadableStream({
       async start(controller) {
         try {
-          const MAX_ITERATIONS = 8;
+          // ── Step 1: Agent 1 — The Specialist ──────────────────────────────
+          controller.enqueue(encoder.encode(sseEvent('pipeline_status', { status: 'specialist', message: 'Committee deliberating — Specialist is drafting...' })));
 
-          for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-            // ── Call NVIDIA API with tools ──────────────────────────────────
-            const nvidiaResponse = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${NVIDIA_API_KEY}`,
-                'Accept': 'text/event-stream',
-              },
-              body: JSON.stringify({
-                model: MODEL_ID,
-                messages: aiMessages,
-                tools: TOOLS,
-                stream: true,
-                temperature: 0.6,
-                top_p: 0.7,
-                max_tokens: 32768,
-              }),
-            });
+          let specialistDraft = '';
+          try {
+            specialistDraft = await runAgent1Specialist(userMessages, controller, encoder);
+          } catch (err) {
+            console.error('Agent 1 error:', err);
+            specialistDraft = '';
+            controller.enqueue(encoder.encode(sseEvent('agent_content', {
+              agent: 'specialist',
+              content: '\n*Specialist encountered an error. Proceeding with available input.*\n\n',
+            })));
+          }
 
-            if (!nvidiaResponse.ok) {
-              const errorText = await nvidiaResponse.text();
-              console.error(`NVIDIA API error ${nvidiaResponse.status}: ${errorText.slice(0, 500)}`);
+          // Execute any tools found in the specialist draft
+          if (specialistDraft) {
+            const cleanedDraft = await executeToolsFromDraft(specialistDraft, controller, encoder);
+            fullResponse += cleanedDraft;
+          }
 
-              // If tools not supported, retry without tools (fallback mode)
-              if (nvidiaResponse.status === 400 && errorText.includes('tool')) {
-                console.log('Tools not supported, falling back to text-based tool calling...');
-                const fallbackResponse = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${NVIDIA_API_KEY}`,
-                    'Accept': 'text/event-stream',
-                  },
-                  body: JSON.stringify({
-                    model: MODEL_ID,
-                    messages: [
-                      { role: 'system', content: SYSTEM_PROMPT + '\n\nIMPORTANT: You MUST use tools by outputting ```tool JSON blocks. Example:\n```tool\n{"tool": "create_file", "path": "hello.py", "content": "print(\\"hello\\")"}\n```' },
-                      ...messages.map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })),
-                    ],
-                    stream: true,
-                    temperature: 0.6,
-                    top_p: 0.7,
-                    max_tokens: 32768,
-                  }),
-                });
+          // ── Step 2: Agent 2 — The Critic ─────────────────────────────────
+          controller.enqueue(encoder.encode(sseEvent('pipeline_status', { status: 'critic', message: 'Committee deliberating — Critic is reviewing...' })));
 
-                if (!fallbackResponse.ok) {
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', content: `API error: ${fallbackResponse.status}` })}\n\n`));
-                  break;
-                }
+          let criticResult = { content: '', reasoning: '' };
+          try {
+            criticResult = await runAgent2Critic(userMessages, specialistDraft, controller, encoder);
+          } catch (err) {
+            console.error('Agent 2 error:', err);
+            criticResult = { content: '', reasoning: '' };
+            controller.enqueue(encoder.encode(sseEvent('agent_content', {
+              agent: 'critic',
+              content: '\n*Critic encountered an error. Proceeding with Specialist draft.*\n\n',
+            })));
+          }
 
-                // Process fallback response with text-based tool parsing
-                await processStreamWithTextToolParsing(fallbackResponse, controller, encoder, aiMessages, fullResponse);
-                fullResponse = ''; // will be updated by the function
-                break;
-              }
+          // ── Step 3: Agent 3 — The Judge ───────────────────────────────────
+          controller.enqueue(encoder.encode(sseEvent('pipeline_status', { status: 'judge', message: 'Committee deliberating — Judge is delivering final answer...' })));
 
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', content: `NVIDIA API error: ${nvidiaResponse.status}` })}\n\n`));
-              break;
-            }
+          let judgeFinal = '';
+          try {
+            // If critic failed but specialist succeeded, use specialist draft as critic input
+            const criticInput = criticResult.content || specialistDraft;
+            judgeFinal = await runAgent3Judge(userMessages, specialistDraft, criticInput, controller, encoder);
+          } catch (err) {
+            console.error('Agent 3 error:', err);
+            judgeFinal = '';
+            controller.enqueue(encoder.encode(sseEvent('agent_content', {
+              agent: 'judge',
+              content: '\n*Judge encountered an error. Providing best available response.*\n\n',
+            })));
+          }
 
-            // ── Stream and collect tool calls ──────────────────────────────
-            const reader = nvidiaResponse.body?.getReader();
-            if (!reader) break;
-
-            const decoder = new TextDecoder();
-            let buffer = '';
-            let iterationContent = '';
-            let finishReason: string | null = null;
-
-            // Collect tool calls from streaming deltas
-            const toolCallsMap = new Map<number, CollectedToolCall>();
-
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-
-              buffer += decoder.decode(value, { stream: true });
-              const lines = buffer.split('\n');
-              buffer = lines.pop() || '';
-
-              for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed || !trimmed.startsWith('data: ')) continue;
-                const data = trimmed.slice(6);
-                if (data === '[DONE]') continue;
-
-                try {
-                  const parsed = JSON.parse(data);
-                  const choice = parsed.choices?.[0];
-                  if (!choice) continue;
-
-                  const delta = choice.delta;
-
-                  // Handle text content
-                  if (delta?.content) {
-                    iterationContent += delta.content;
-                    fullResponse += delta.content;
-
-                    // Filter out tool markers from displayed content
-                    const filteredContent = delta.content
-                      .replace(/<\|tool_calls_section_begin\|>/g, '')
-                      .replace(/<\|tool_call_begin\|>/g, '')
-                      .replace(/<\|tool_call_argument_begin\|>/g, '')
-                      .replace(/<\|tool_call_end\|>/g, '');
-
-                    if (filteredContent) {
-                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'content', content: filteredContent })}\n\n`));
-                    }
-                  }
-
-                  // Handle native tool calls
-                  if (delta?.tool_calls) {
-                    for (const tc of delta.tool_calls) {
-                      const idx = tc.index ?? 0;
-                      if (!toolCallsMap.has(idx)) {
-                        toolCallsMap.set(idx, {
-                          id: tc.id || `call_${idx}`,
-                          name: tc.function?.name || '',
-                          arguments: '',
-                        });
-                      }
-                      const existing = toolCallsMap.get(idx)!;
-                      if (tc.id) existing.id = tc.id;
-                      if (tc.function?.name) existing.name = tc.function.name;
-                      if (tc.function?.arguments) existing.arguments += tc.function.arguments;
-                    }
-                  }
-
-                  // Handle finish reason
-                  if (choice.finish_reason) {
-                    finishReason = choice.finish_reason;
-                  }
-                } catch { /* skip */ }
-              }
-            }
-
-            // ── Process tool calls ──────────────────────────────────────────
-            const hasNativeToolCalls = toolCallsMap.size > 0;
-
-            // Also check for text-based tool calls as fallback
-            const { toolCalls: textToolCalls, cleanText } = parseToolCallsFromText(iterationContent);
-
-            let toolCallsToExecute: { name: string; args: Record<string, unknown>; id: string }[] = [];
-
-            if (hasNativeToolCalls) {
-              // Use native function calling tool calls
-              for (const [idx, tc] of toolCallsMap) {
-                try {
-                  const args = JSON.parse(tc.arguments);
-                  toolCallsToExecute.push({ name: tc.name, args, id: tc.id });
-                } catch {
-                  console.error(`Failed to parse tool call arguments: ${tc.arguments}`);
-                }
-              }
-            } else if (textToolCalls.length > 0) {
-              // Fallback to text-based tool calls
-              toolCallsToExecute = textToolCalls.map((tc, i) => ({
-                name: tc.name,
-                args: tc.args,
-                id: `text_call_${i}`,
-              }));
-
-              // If we extracted tool calls from text, update the displayed content to remove them
-              if (cleanText !== iterationContent && cleanText) {
-                // The tool call blocks were already filtered in streaming, no need to re-send
-              }
-            }
-
-            // No tool calls — we're done
-            if (toolCallsToExecute.length === 0) {
-              break;
-            }
-
-            // ── Execute tools ───────────────────────────────────────────────
-            const toolResults: { id: string; name: string; result: string }[] = [];
-
-            for (const tc of toolCallsToExecute) {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-                type: 'tool_start',
-                tool: tc.name,
-                path: (tc.args.path as string) || '',
-                command: (tc.args.command as string) || '',
-              })}\n\n`));
-
-              const result = await executeTool(tc.name, tc.args);
-              toolResults.push({ id: tc.id, name: tc.name, result });
-
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-                type: 'tool_result',
-                tool: tc.name,
-                result,
-              })}\n\n`));
-            }
-
-            // ── Build messages for next iteration ───────────────────────────
-            if (hasNativeToolCalls) {
-              // Standard OpenAI function calling format
-              aiMessages.push({
-                role: 'assistant',
-                content: iterationContent || null,
-                tool_calls: toolCallsToExecute.map((tc, i) => ({
-                  id: tc.id,
-                  type: 'function',
-                  function: { name: tc.name, arguments: JSON.stringify(tc.args) },
-                })),
-              } as any);
-
-              for (const tr of toolResults) {
-                aiMessages.push({
-                  role: 'tool',
-                  content: tr.result,
-                  tool_call_id: tr.id,
-                } as any);
-              }
-            } else {
-              // Text-based tool calling format
-              aiMessages.push({ role: 'assistant', content: iterationResponse_clean(cleanText, iterationContent) });
-
-              const resultsSummary = toolResults.map(tr =>
-                `Tool: ${tr.name}\nResult: ${tr.result}`
-              ).join('\n\n---\n\n');
-
-              aiMessages.push({
-                role: 'user',
-                content: `Tool execution results:\n\n${resultsSummary}\n\nContinue based on these results. If everything is working, summarize what you did. If there are errors, fix them using the appropriate tools.`,
-              });
-            }
-
-            fullResponse += `\n\n${toolResults.map(tr => `[${tr.name}] ${tr.result}`).join('\n')}`;
-
-            // If finish_reason is not tool_calls, the model is done
-            if (finishReason && finishReason !== 'tool_calls') {
-              break;
-            }
+          // If judge succeeded, the final response is the judge's output.
+          // If judge failed but critic succeeded, use critic's output.
+          // If both failed, use specialist's output.
+          if (judgeFinal) {
+            fullResponse = judgeFinal;
+          } else if (criticResult.content) {
+            fullResponse = criticResult.content;
+          } else {
+            fullResponse = specialistDraft || 'I encountered an issue processing your request. Please try again.';
           }
 
           // Save assistant response to database
@@ -569,12 +729,15 @@ export async function POST(req: NextRequest) {
             } catch (dbError) { console.error('Failed to save assistant message:', dbError); }
           }
 
+          // Signal pipeline completion
+          controller.enqueue(encoder.encode(sseEvent('pipeline_status', { status: 'complete', message: 'Committee has reached consensus.' })));
+
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           controller.close();
         } catch (error) {
           console.error('Streaming error:', error);
           try {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', content: 'Stream interrupted. Please try again.' })}\n\n`));
+            controller.enqueue(encoder.encode(sseEvent('error', { content: 'Stream interrupted. Please try again.' })));
           } catch { /* controller already closed */ }
           controller.close();
         }
@@ -595,81 +758,4 @@ export async function POST(req: NextRequest) {
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
-}
-
-// ─── Helper for fallback text-based tool parsing stream ──────────────────────
-
-async function processStreamWithTextToolParsing(
-  response: Response,
-  controller: WritableStreamDefaultController,
-  encoder: TextEncoder,
-  aiMessages: Array<{ role: string; content?: string }>,
-  fullResponseRef: string,
-): Promise<void> {
-  const reader = response.body?.getReader();
-  if (!reader) return;
-
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let iterationResponse = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith('data: ')) continue;
-      const data = trimmed.slice(6);
-      if (data === '[DONE]') continue;
-
-      try {
-        const parsed = JSON.parse(data);
-        const content = parsed.choices?.[0]?.delta?.content;
-        if (content) {
-          iterationResponse += content;
-
-          const filteredContent = content
-            .replace(/<\|tool_calls_section_begin\|>/g, '')
-            .replace(/<\|tool_call_begin\|>/g, '')
-            .replace(/<\|tool_call_argument_begin\|>/g, '')
-            .replace(/<\|tool_call_end\|>/g, '');
-
-          if (filteredContent) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'content', content: filteredContent })}\n\n`));
-          }
-        }
-      } catch { /* skip */ }
-    }
-  }
-
-  // Check for text-based tool calls
-  const { toolCalls, cleanText } = parseToolCallsFromText(iterationResponse);
-
-  if (toolCalls.length > 0) {
-    for (const tc of toolCalls) {
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-        type: 'tool_start',
-        tool: tc.name,
-        path: (tc.args.path as string) || '',
-        command: (tc.args.command as string) || '',
-      })}\n\n`));
-
-      const result = await executeTool(tc.name, tc.args);
-
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-        type: 'tool_result',
-        tool: tc.name,
-        result,
-      })}\n\n`));
-    }
-  }
-}
-
-function iterationResponse_clean(cleanText: string, original: string): string {
-  return cleanText || original.replace(/```tool[\s\S]*?```/g, '').trim();
 }

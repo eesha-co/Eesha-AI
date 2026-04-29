@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Code2, Zap, Globe, BookOpen, Rocket, Lightbulb, Cpu, GitBranch } from 'lucide-react';
+import { Code2, Zap, Globe, BookOpen, Rocket, Lightbulb, Cpu, Shield, Sparkles, Eye, Scale } from 'lucide-react';
 
 interface EmptyStateProps {
   onSuggestionClick?: (text: string) => void;
@@ -52,25 +52,33 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
             What do you want to build?
           </h2>
           <p className="text-sm text-[var(--text-tertiary)] max-w-md mx-auto">
-            Eesha AI can write, debug, and deploy code. Ask anything — from quick scripts to full applications.
+            Eesha AI can write, debug, and deploy code — now powered by a Committee of AI agents that draft, critique, and refine every answer.
           </p>
         </motion.div>
 
-        {/* Model badge — compact chip */}
+        {/* Model badge — committee chips */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4, delay: 0.2 }}
-          className="mb-5 flex items-center gap-1.5 rounded-full border border-white/10 dark:border-white/10 bg-white/10 dark:bg-white/5 backdrop-blur-md px-3 py-1"
+          className="mb-5 flex flex-wrap items-center justify-center gap-1.5"
         >
-          <Cpu className="size-3 text-cyan-400" />
-          <span className="text-[11px] text-foreground/70">Kimi K2.5</span>
-          <span className="text-foreground/20">·</span>
-          <GitBranch className="size-2.5 text-violet-400" />
-          <span className="text-[11px] text-foreground/70">Thinking</span>
-          <span className="text-foreground/20">·</span>
-          <Rocket className="size-2.5 text-primary/70" />
-          <span className="text-[11px] text-foreground/70">H100s</span>
+          <div className="flex items-center gap-1.5 rounded-full border border-white/10 dark:border-white/10 bg-white/10 dark:bg-white/5 backdrop-blur-md px-3 py-1">
+            <Shield className="size-3 text-blue-400" />
+            <span className="text-[11px] text-foreground/70">Committee of AI</span>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-full border border-white/10 dark:border-white/10 bg-blue-500/10 backdrop-blur-md px-2.5 py-1">
+            <Sparkles className="size-2.5 text-blue-400" />
+            <span className="text-[11px] text-blue-400/80">Specialist</span>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-full border border-white/10 dark:border-white/10 bg-amber-500/10 backdrop-blur-md px-2.5 py-1">
+            <Eye className="size-2.5 text-amber-400" />
+            <span className="text-[11px] text-amber-400/80">Critic</span>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-full border border-white/10 dark:border-white/10 bg-emerald-500/10 backdrop-blur-md px-2.5 py-1">
+            <Scale className="size-2.5 text-emerald-400" />
+            <span className="text-[11px] text-emerald-400/80">Judge</span>
+          </div>
         </motion.div>
 
         {/* Suggestion chips — compact */}
@@ -106,10 +114,10 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
           className="mt-5 flex items-center gap-1.5 text-[10px] text-foreground/25"
         >
           <Rocket className="size-2.5 text-primary/30" />
-          <span>Powered by Kimi K2.5 via NVIDIA API</span>
+          <span>Powered by Qwen Coder + Kimi K2 + Mistral Large via NVIDIA API</span>
           <span className="mx-0.5">·</span>
           <Lightbulb className="size-2.5 text-amber-400/30" />
-          <span>Thinking Mode</span>
+          <span>Multi-Agent Consensus</span>
         </motion.div>
 
       </div>

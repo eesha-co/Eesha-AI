@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Square, Code2, Sparkles, Globe, Paperclip } from 'lucide-react';
+import { Send, Square, Code2, Sparkles, Globe, Paperclip, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface InputAreaProps {
@@ -141,8 +141,8 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
         {/* Bottom info */}
         <div className="mt-2 flex items-center justify-between px-1">
           <div className="flex items-center gap-1.5">
-            <Sparkles className="size-3 text-primary/40" />
-            <span className="text-[11px] text-foreground/25">Eesha AI with Thinking Mode</span>
+            <Shield className="size-3 text-primary/40" />
+            <span className="text-[11px] text-foreground/25">Eesha AI — Committee of AI</span>
           </div>
           <span className="text-[11px] text-foreground/25">
             AI can make mistakes. Review code carefully.

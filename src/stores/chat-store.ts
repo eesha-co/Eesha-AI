@@ -2,12 +2,25 @@ import { create } from 'zustand';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
+export type AgentName = 'specialist' | 'critic' | 'judge';
+
+export interface AgentSection {
+  agent: AgentName;
+  content: string;
+  thinking?: string;
+  isThinking?: boolean;
+  status: 'waiting' | 'thinking' | 'generating' | 'done' | 'error';
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   thinking?: string;
   isThinking?: boolean;
+  agentSections?: AgentSection[];
+  activeAgent?: AgentName | null;
+  pipelineStatus?: string | null;
   createdAt?: string;
 }
 
@@ -41,6 +54,14 @@ interface ChatState {
   appendThinking: (conversationId: string, thinking: string) => void;
   setThinkingDone: (conversationId: string) => void;
 
+  // Multi-agent methods
+  updateAgentSection: (conversationId: string, agent: AgentName, updates: Partial<AgentSection>) => void;
+  appendAgentContent: (conversationId: string, agent: AgentName, content: string) => void;
+  appendAgentThinking: (conversationId: string, agent: AgentName, thinking: string) => void;
+  setActiveAgent: (conversationId: string, agent: AgentName | null) => void;
+  setPipelineStatus: (conversationId: string, status: string | null) => void;
+  setAgentStatus: (conversationId: string, agent: AgentName, status: AgentSection['status']) => void;
+
   getActiveConversation: () => Conversation | undefined;
 }
 
@@ -70,6 +91,31 @@ function applyTheme(mode: ThemeMode) {
   try {
     localStorage.setItem('eesha-theme', JSON.stringify({ mode }));
   } catch {}
+}
+
+// Helper: get or create agent section in last assistant message
+function updateAgentSectionsInMessage(
+  messages: Message[],
+  agent: AgentName,
+  updater: (section: AgentSection) => AgentSection,
+): Message[] {
+  const newMessages = [...messages];
+  const lastIdx = newMessages.length - 1;
+  if (lastIdx < 0 || newMessages[lastIdx].role !== 'assistant') return newMessages;
+
+  const msg = { ...newMessages[lastIdx] };
+  const sections = [...(msg.agentSections || [])];
+
+  const existIdx = sections.findIndex(s => s.agent === agent);
+  if (existIdx >= 0) {
+    sections[existIdx] = updater({ ...sections[existIdx] });
+  } else {
+    sections.push(updater({ agent, content: '', thinking: '', status: 'waiting' }));
+  }
+
+  msg.agentSections = sections;
+  newMessages[lastIdx] = msg;
+  return newMessages;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -164,6 +210,65 @@ export const useChatStore = create<ChatState>((set, get) => ({
           messages[lastIdx] = { ...messages[lastIdx], isThinking: false };
         }
         return { ...c, messages };
+      }),
+    })),
+
+  // Multi-agent methods
+  updateAgentSection: (conversationId, agent, updates) =>
+    set((state) => ({
+      conversations: state.conversations.map((c) => {
+        if (c.id !== conversationId) return c;
+        return { ...c, messages: updateAgentSectionsInMessage(c.messages, agent, (section) => ({ ...section, ...updates })) };
+      }),
+    })),
+
+  appendAgentContent: (conversationId, agent, content) =>
+    set((state) => ({
+      conversations: state.conversations.map((c) => {
+        if (c.id !== conversationId) return c;
+        return { ...c, messages: updateAgentSectionsInMessage(c.messages, agent, (section) => ({ ...section, content: section.content + content })) };
+      }),
+    })),
+
+  appendAgentThinking: (conversationId, agent, thinking) =>
+    set((state) => ({
+      conversations: state.conversations.map((c) => {
+        if (c.id !== conversationId) return c;
+        return { ...c, messages: updateAgentSectionsInMessage(c.messages, agent, (section) => ({ ...section, thinking: (section.thinking || '') + thinking, isThinking: true })) };
+      }),
+    })),
+
+  setActiveAgent: (conversationId, agent) =>
+    set((state) => ({
+      conversations: state.conversations.map((c) => {
+        if (c.id !== conversationId) return c;
+        const messages = [...c.messages];
+        const lastIdx = messages.length - 1;
+        if (lastIdx >= 0 && messages[lastIdx].role === 'assistant') {
+          messages[lastIdx] = { ...messages[lastIdx], activeAgent: agent };
+        }
+        return { ...c, messages };
+      }),
+    })),
+
+  setPipelineStatus: (conversationId, status) =>
+    set((state) => ({
+      conversations: state.conversations.map((c) => {
+        if (c.id !== conversationId) return c;
+        const messages = [...c.messages];
+        const lastIdx = messages.length - 1;
+        if (lastIdx >= 0 && messages[lastIdx].role === 'assistant') {
+          messages[lastIdx] = { ...messages[lastIdx], pipelineStatus: status };
+        }
+        return { ...c, messages };
+      }),
+    })),
+
+  setAgentStatus: (conversationId, agent, status) =>
+    set((state) => ({
+      conversations: state.conversations.map((c) => {
+        if (c.id !== conversationId) return c;
+        return { ...c, messages: updateAgentSectionsInMessage(c.messages, agent, (section) => ({ ...section, status })) };
       }),
     })),
 

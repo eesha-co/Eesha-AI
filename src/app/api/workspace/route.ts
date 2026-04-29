@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { getAuthUserId, unauthorizedResponse } from '@/lib/api-auth';
 
 export const runtime = 'nodejs';
 
@@ -59,6 +60,12 @@ interface FileEntry {
 
 // GET — list directory or read file
 export async function GET(req: NextRequest) {
+  // ━━━ SECURITY: Authenticate user ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const userId = await getAuthUserId();
+  if (!userId) {
+    return unauthorizedResponse();
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const filePath = searchParams.get('path') || '';
@@ -67,13 +74,11 @@ export async function GET(req: NextRequest) {
     const fullPath = safePath(filePath);
 
     if (action === 'read') {
-      // Check if file exists
       const stat = await fs.stat(fullPath);
       if (!stat.isFile()) {
         return NextResponse.json({ error: 'Not a file', path: filePath }, { status: 400 });
       }
 
-      // Check if binary
       if (isBinaryFile(filePath)) {
         return NextResponse.json({
           content: null,
@@ -95,7 +100,6 @@ export async function GET(req: NextRequest) {
           size: stat.size,
         });
       } catch (readError) {
-        // If UTF-8 reading fails, treat as binary
         return NextResponse.json({
           content: null,
           path: filePath,
@@ -113,7 +117,6 @@ export async function GET(req: NextRequest) {
       const files: FileEntry[] = [];
 
       for (const entry of entries) {
-        // Skip hidden files and node_modules
         if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === '__pycache__') continue;
 
         const entryPath = path.join(filePath, entry.name);
@@ -136,7 +139,6 @@ export async function GET(req: NextRequest) {
         files.push({ name: entry.name, path: entryPath, type, size, modified, language, isBinary });
       }
 
-      // Sort: directories first, then alphabetical
       files.sort((a, b) => {
         if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
         return a.name.localeCompare(b.name);
@@ -154,6 +156,12 @@ export async function GET(req: NextRequest) {
 
 // POST — create file or directory
 export async function POST(req: NextRequest) {
+  // ━━━ SECURITY: Authenticate user ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const userId = await getAuthUserId();
+  if (!userId) {
+    return unauthorizedResponse();
+  }
+
   try {
     const { path: filePath, content, type } = await req.json();
 
@@ -185,6 +193,12 @@ export async function POST(req: NextRequest) {
 
 // PUT — update file content
 export async function PUT(req: NextRequest) {
+  // ━━━ SECURITY: Authenticate user ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const userId = await getAuthUserId();
+  if (!userId) {
+    return unauthorizedResponse();
+  }
+
   try {
     const { path: filePath, content } = await req.json();
 
@@ -194,7 +208,6 @@ export async function PUT(req: NextRequest) {
 
     const fullPath = safePath(filePath);
 
-    // Ensure parent directory exists
     await fs.mkdir(path.dirname(fullPath), { recursive: true });
     await fs.writeFile(fullPath, content, 'utf-8');
     return NextResponse.json({ success: true, path: filePath });
@@ -206,6 +219,12 @@ export async function PUT(req: NextRequest) {
 
 // DELETE — delete file or directory
 export async function DELETE(req: NextRequest) {
+  // ━━━ SECURITY: Authenticate user ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const userId = await getAuthUserId();
+  if (!userId) {
+    return unauthorizedResponse();
+  }
+
   try {
     const { path: filePath } = await req.json();
 

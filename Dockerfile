@@ -26,14 +26,14 @@ FROM node:20-slim AS runner
 
 WORKDIR /app
 
-# Install runtime dependencies (python for code execution, git, sqlite3, etc.)
+# Install runtime dependencies (python for code execution, git, etc.)
+# NOTE: Removed sqlite3 since we now use Supabase PostgreSQL
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     git \
     curl \
     wget \
-    sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set environment
@@ -54,45 +54,22 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # Set environment variables for runtime
+# NOTE: DATABASE_URL and DIRECT_URL must be set as HF Spaces Secrets
+# NOTE: NEXTAUTH_SECRET must be set as HF Spaces Secret
 ENV WORKSPACE_ROOT=/app/workspace
-ENV DATABASE_URL=file:/app/data/eeshai.db
 
 # Expose HF Space port
 EXPOSE 7860
 
-# Create startup script that initializes DB with raw SQL before starting
+# Create startup script
 RUN cat > /app/start.sh << 'SQLEOF'
 #!/bin/sh
 cd /app
 
-# Initialize SQLite database with schema
-DB_PATH="/app/data/eeshai.db"
-if [ ! -f "$DB_PATH" ] || [ ! -s "$DB_PATH" ]; then
-  echo "Initializing database..."
-  sqlite3 "$DB_PATH" "
-    CREATE TABLE IF NOT EXISTS Conversation (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL DEFAULT 'New Chat',
-      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS Message (
-      id TEXT PRIMARY KEY,
-      role TEXT NOT NULL,
-      content TEXT NOT NULL,
-      thinking TEXT,
-      conversationId TEXT NOT NULL,
-      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (conversationId) REFERENCES Conversation(id) ON DELETE CASCADE
-    );
-    CREATE INDEX IF NOT EXISTS Message_conversationId_idx ON Message(conversationId);
-  "
-  echo "Database initialized!"
-else
-  echo "Database already exists."
-fi
-
 echo "Eesha AI starting on port 7860..."
+echo "Database: PostgreSQL (Supabase)"
+echo "Auth: NextAuth.js"
+
 node server.js
 SQLEOF
 RUN chmod +x /app/start.sh

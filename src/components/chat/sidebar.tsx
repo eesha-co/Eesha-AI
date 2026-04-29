@@ -3,9 +3,10 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useChatStore, ThemeMode, Conversation } from '@/stores/chat-store';
-import { Plus, MessageSquare, Trash2, PanelLeftClose, Search, Settings, X, Zap, Sun, Moon, Monitor } from 'lucide-react';
+import { Plus, MessageSquare, Trash2, PanelLeftClose, Search, Settings, X, Zap, Sun, Moon, Monitor, LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useSession, signOut } from 'next-auth/react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -84,6 +85,8 @@ export function Sidebar() {
     deleteConversation,
   } = useChatStore();
 
+  const { data: session } = useSession();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null);
 
@@ -115,6 +118,10 @@ export function Sidebar() {
       // silently fail
     }
     setDeleteTarget(null);
+  };
+
+  const handleSignOut = async () => {
+    await signOut({ callbackUrl: '/login' });
   };
 
   return (
@@ -235,15 +242,40 @@ export function Sidebar() {
             </div>
           </ScrollArea>
 
-          {/* Footer with theme toggle */}
+          {/* Footer with user info and controls */}
           <div className="border-t border-border px-3 py-3">
             <div className="mb-3">
               <ThemeToggle />
             </div>
-            <button className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-accent hover:text-foreground">
-              <Settings className="size-4" />
-              Settings
-            </button>
+
+            {/* User info section */}
+            {session?.user && (
+              <div className="mb-2 flex items-center gap-2.5 rounded-lg bg-white/5 dark:bg-white/5 px-2.5 py-2">
+                <div className="flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-cyan-600 text-xs font-bold text-white">
+                  {session.user.name?.[0]?.toUpperCase() || <User className="size-4" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="truncate text-xs font-medium text-foreground">{session.user.name || 'User'}</p>
+                  <p className="truncate text-[10px] text-[var(--text-tertiary)]">{session.user.email}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <button className="flex flex-1 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-accent hover:text-foreground">
+                <Settings className="size-4" />
+                Settings
+              </button>
+              {session && (
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center gap-1 rounded-lg px-2.5 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-red-500/10 hover:text-red-400"
+                  title="Sign out"
+                >
+                  <LogOut className="size-4" />
+                </button>
+              )}
+            </div>
             <div className="mt-2 flex items-center gap-2 px-2.5">
               <span className="relative flex size-2">
                 <span className="animate-status-pulse absolute inline-flex size-full rounded-full bg-emerald-500 opacity-75" />

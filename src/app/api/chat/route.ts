@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { db, isDatabaseAvailable } from '@/lib/db';
+import { getAuthUserId, unauthorizedResponse } from '@/lib/api-auth';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
@@ -343,7 +344,6 @@ async function callNvidiaAPI(
   const decoder = new TextDecoder();
   let buffer = '';
   let fullContent = '';
-  let fullReasoning = '';
 
   while (true) {
     const { done, value } = await reader.read();
@@ -365,10 +365,6 @@ async function callNvidiaAPI(
         if (!choice) continue;
         const delta = choice.delta;
 
-        // Capture reasoning (Kimi K2 thinking model)
-        if (delta?.reasoning_content) {
-          fullReasoning += delta.reasoning_content;
-        }
         if (delta?.content) {
           fullContent += delta.content;
         }
@@ -380,7 +376,6 @@ async function callNvidiaAPI(
 }
 
 // ─── File Block Parser ────────────────────────────────────────────────────────
-// Extracts ---FILE: path--- blocks from the synthesis output and executes them
 
 interface FileBlock {
   path: string;
@@ -399,7 +394,6 @@ function parseFileBlocks(text: string): { files: FileBlock[]; cleanText: string 
     });
   }
 
-  // Remove file blocks from the displayed text
   const cleanText = text.replace(regex, '').replace(/\n{3,}/g, '\n\n').trim();
   return { files, cleanText };
 }
@@ -446,6 +440,12 @@ function parseToolCallsFromText(text: string): { toolCalls: { name: string; args
 // ─── Main POST Handler — Parallel Round Table Architecture ────────────────────
 
 export async function POST(req: NextRequest) {
+  // ━━━ SECURITY: Authenticate user ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const userId = await getAuthUserId();
+  if (!userId) {
+    return unauthorizedResponse();
+  }
+
   try {
     const { messages, conversationId } = await req.json();
 
@@ -461,6 +461,22 @@ export async function POST(req: NextRequest) {
         JSON.stringify({ error: 'Agent API keys not configured.' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
+    }
+
+    // ━━━ SECURITY: Verify conversation belongs to user ━━━━━━━━━━━━━━━━━━━━
+    if (conversationId && isDatabaseAvailable()) {
+      try {
+        const conversation = await db.conversation.findUnique({
+          where: { id: conversationId },
+          select: { userId: true },
+        });
+        if (conversation && conversation.userId !== userId) {
+          return new Response(
+            JSON.stringify({ error: 'Access denied.' }),
+            { status: 403, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+      } catch (dbError) { console.error('Conversation ownership check failed:', dbError); }
     }
 
     // Save user message to database
@@ -491,11 +507,9 @@ export async function POST(req: NextRequest) {
     const readableStream = new ReadableStream({
       async start(controller) {
         try {
-          // ━━━ PHASE 1: PARALLEL DELIBERATION ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          // All 3 agents work simultaneously — no waiting for each other
+          // ━━━ PHASE 1: PARALLEL DELIBERATION ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           controller.enqueue(encoder.encode(sse('deliberation', { status: 'started' })));
 
-          // Run all 3 agents in parallel with Promise.allSettled
           const [architectResult, securityResult, optimizerResult] = await Promise.allSettled([
             // Agent 1: The Architect
             (async () => {
@@ -511,7 +525,6 @@ export async function POST(req: NextRequest) {
             // Agent 2: The Security Expert
             (async () => {
               controller.enqueue(encoder.encode(sse('agent_update', { agent: 'security', status: 'working' })));
-              // Security expert reviews the question directly — it doesn't need to wait for Architect
               const content = await callNvidiaAPI(AGENT2_MODEL, AGENT2_API_KEY, [
                 { role: 'system', content: SECURITY_SYSTEM_PROMPT },
                 {
@@ -538,7 +551,6 @@ export async function POST(req: NextRequest) {
             })(),
           ]);
 
-          // Extract results (use empty string for failed agents)
           const architectDraft = architectResult.status === 'fulfilled' ? architectResult.value : '';
           const securityAnalysis = securityResult.status === 'fulfilled' ? securityResult.value : '';
           const optimizerAnalysis = optimizerResult.status === 'fulfilled' ? optimizerResult.value : '';
@@ -550,7 +562,7 @@ export async function POST(req: NextRequest) {
             return;
           }
 
-          // ━━━ PHASE 2: SYNTHESIS — One fast call combines everything ━━━━━━━━
+          // ━━━ PHASE 2: SYNTHESIS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           controller.enqueue(encoder.encode(sse('deliberation', { status: 'synthesizing' })));
 
           const synthesisContent = await callNvidiaAPI(AGENT1_MODEL, AGENT1_API_KEY, [
@@ -563,11 +575,9 @@ export async function POST(req: NextRequest) {
 
           controller.enqueue(encoder.encode(sse('deliberation', { status: 'complete' })));
 
-          // ━━━ PHASE 3: STREAM FINAL ANSWER + EXECUTE FILES ━━━━━━━━━━━━━━━━━━
-          // Parse file blocks and execute them
+          // ━━━ PHASE 3: STREAM FINAL ANSWER + EXECUTE FILES ━━━━━━━━━━━━━━
           const { files, cleanText } = parseFileBlocks(synthesisContent);
 
-          // Execute file creation
           for (const file of files) {
             controller.enqueue(encoder.encode(sse('tool_start', {
               tool: 'create_file',
@@ -583,7 +593,6 @@ export async function POST(req: NextRequest) {
             })));
           }
 
-          // Also check for legacy ```tool blocks
           const { toolCalls, cleanText: finalCleanText } = parseToolCallsFromText(cleanText);
 
           for (const tc of toolCalls) {
@@ -601,22 +610,36 @@ export async function POST(req: NextRequest) {
             })));
           }
 
-          // Stream the final clean response to the frontend
           const finalResponse = finalCleanText || synthesisContent;
 
-          // Stream in chunks for smooth UX
+          // Stream in chunks
           const CHUNK_SIZE = 8;
           for (let i = 0; i < finalResponse.length; i += CHUNK_SIZE) {
             const chunk = finalResponse.slice(i, i + CHUNK_SIZE);
             controller.enqueue(encoder.encode(sse('content', { content: chunk })));
           }
 
-          // Save to database
+          // Save to database — scoped to authenticated user
           if (conversationId && finalResponse && isDatabaseAvailable()) {
             try {
               await db.message.create({ data: { role: 'assistant', content: finalResponse, conversationId } });
               await db.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
             } catch (dbError) { console.error('Failed to save assistant message:', dbError); }
+          }
+
+          // ━━━ Track API usage for security monitoring ━━━━━━━━━━━━━━━━━━━
+          if (isDatabaseAvailable()) {
+            try {
+              await db.apiUsage.create({
+                data: {
+                  userId,
+                  endpoint: 'chat',
+                  model: 'committee',
+                  tokensIn: userQuestion.length,
+                  tokensOut: finalResponse.length,
+                },
+              });
+            } catch { /* non-critical */ }
           }
 
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));

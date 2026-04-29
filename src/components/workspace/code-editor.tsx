@@ -58,7 +58,7 @@ export function CodeEditor() {
   if (openFiles.length === 0) {
     return (
       <div className="relative flex h-full flex-col items-center justify-center bg-white/20 dark:bg-black/20 backdrop-blur-sm text-muted-foreground overflow-hidden">
-        {/* Background logo watermark — always visible, content overlays it */}
+        {/* Logo watermark — always visible, content overlays it */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <img
             src="/logo-transparent.png"
@@ -72,15 +72,9 @@ export function CodeEditor() {
             }}
           />
         </div>
-        {/* Content overlays the logo */}
-        <div className="relative z-10 flex flex-col items-center gap-4">
-          <div className="text-center">
-            <h2 className="text-xl font-semibold bg-gradient-to-r from-violet-500 via-cyan-400 to-violet-500 bg-clip-text text-transparent">
-              Eesha AI
-            </h2>
-            <p className="mt-2 text-sm text-[var(--text-secondary)]">Workspace</p>
-            <p className="mt-1 text-xs text-[var(--text-tertiary)]">Open a file from the explorer or ask the AI to create one</p>
-          </div>
+        {/* Hint text overlays the logo */}
+        <div className="relative z-10 flex flex-col items-center">
+          <p className="text-xs text-[var(--text-tertiary)]">Open a file from the explorer or ask the AI to create one</p>
         </div>
       </div>
     );

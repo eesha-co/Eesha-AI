@@ -400,7 +400,7 @@ export function AuthModal() {
                     <>
                       <h2 className="text-xl font-bold text-white">Verify your email</h2>
                       <p className="mt-2 text-sm text-zinc-400">
-                        We sent a 6-digit code to <strong className="text-white">{email}</strong>
+                        Enter the 6-digit code sent to <strong className="text-white">{email}</strong>
                       </p>
                     </>
                   ) : isCreditExpired ? (
@@ -643,7 +643,7 @@ export function AuthModal() {
                               ) : (
                                 <>
                                   <Shield className="size-4" />
-                                  Create Account & Verify Email
+                                  Create Account & Send Code
                                 </>
                               )}
                             </button>
@@ -671,7 +671,7 @@ export function AuthModal() {
 
                           <div className="text-center">
                             <p className="text-sm text-zinc-400">
-                              Enter the 6-digit code sent to your email
+                              Check your email for a 6-digit verification code
                             </p>
                           </div>
 
@@ -715,7 +715,7 @@ export function AuthModal() {
                           <div className="flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
                             <AlertCircle className="size-4 shrink-0 text-amber-400" />
                             <span className="text-xs text-amber-200">
-                              Your account will be locked until you verify your email. This protects your data from unauthorized access.
+                              Your account is locked until you verify your email. This protects your data from unauthorized access. The code expires after 24 hours.
                             </span>
                           </div>
                         </div>

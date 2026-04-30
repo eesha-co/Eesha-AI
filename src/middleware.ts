@@ -133,10 +133,11 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // ── Skip middleware for static files and NextAuth routes ────────────────
+  // ── Skip middleware for static files, NextAuth routes, and auth confirm ─
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/auth/confirm") ||
     pathname.startsWith("/favicon") ||
     pathname.includes(".")
   ) {

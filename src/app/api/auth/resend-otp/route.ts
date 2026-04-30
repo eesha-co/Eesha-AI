@@ -9,6 +9,10 @@ const RESEND_COOLDOWN_MS = 60_000;       // 1 minute between resends
 
 const lastResendTime = new Map<string, number>();
 
+// ─── POST /api/auth/resend-otp ────────────────────────────────────────────────
+// Resends a 6-digit OTP code to the user's email.
+// Uses signInWithOtp() which ALWAYS sends a code (never a magic link).
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -44,18 +48,28 @@ export async function POST(request: NextRequest) {
       entry.count++;
     }
 
-    // ── Resend OTP via Supabase (anon key — triggers OTP email) ─────────────
-    // Must use anon key (not service role) because the service role bypasses
-    // email verification and does not send OTP emails.
+    // ── Send OTP code via signInWithOtp() ───────────────────────────────────
+    // This ALWAYS sends a 6-digit OTP code to the user's email.
+    // shouldCreateUser: false — the user already exists in Supabase Auth.
     const signupClient = createSignupClient();
 
-    const { error } = await signupClient.auth.resend({
-      type: 'signup',
+    const { error } = await signupClient.auth.signInWithOtp({
       email: emailKey,
+      options: {
+        shouldCreateUser: false,
+      },
     });
 
     if (error) {
       console.error('[RESEND-OTP] Supabase error:', error.message);
+
+      if (error.message.includes('not found') || error.message.includes('No user')) {
+        return NextResponse.json(
+          { error: 'No account found with this email. Please sign up first.' },
+          { status: 404 }
+        );
+      }
+
       return NextResponse.json(
         { error: 'Unable to resend verification code. Please try again.' },
         { status: 500 }

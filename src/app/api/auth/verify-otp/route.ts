@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 
 // ─── Rate limiting for OTP verification attempts ──────────────────────────────
 const otpAttempts = new Map<string, { count: number; resetTime: number }>();
-const MAX_OTP_ATTEMPTS = 10;       // per email per window
+const MAX_OTP_ATTEMPTS = 5;        // per email per window (strict for security)
 const OTP_WINDOW_MS = 15 * 60_000; // 15 minutes
 
 function checkOtpRateLimit(identifier: string): { allowed: boolean; retryAfter?: number } {
@@ -25,7 +25,8 @@ function checkOtpRateLimit(identifier: string): { allowed: boolean; retryAfter?:
 }
 
 // ─── POST /api/auth/verify-otp ────────────────────────────────────────────────
-// Verifies the OTP code sent to the user's email during sign-up.
+// Verifies the 6-digit OTP code sent to the user's email during sign-up.
+// The OTP was sent via signInWithOtp(), so we verify with type: 'email'.
 // On success, marks the user's email as verified in both Supabase and our DB.
 
 export async function POST(request: NextRequest) {
@@ -56,8 +57,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── Rate limiting ───────────────────────────────────────────────────────
-    const rateCheck = checkOtpRateLimit(email.toLowerCase());
+    // ── Rate limiting (strict — only 5 attempts per 15 min) ─────────────────
+    const normalizedEmail = email.toLowerCase().trim();
+    const rateCheck = checkOtpRateLimit(normalizedEmail);
     if (!rateCheck.allowed) {
       return NextResponse.json(
         { error: 'Too many verification attempts. Please request a new code.' },
@@ -66,16 +68,18 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Verify OTP with Supabase ────────────────────────────────────────────
+    // Since the OTP was sent via signInWithOtp(), we use type: 'email'
     const supabase = createServerSupabaseClient();
 
     const { data, error } = await supabase.auth.verifyOtp({
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
       token: otp,
-      type: 'signup',
+      type: 'email',
     });
 
     if (error) {
-      // Map common errors
+      console.error('[VERIFY-OTP] Supabase error:', error.message, '| Status:', error.status);
+
       if (error.message.includes('expired') || error.message.includes('Token has expired')) {
         return NextResponse.json(
           { error: 'Verification code has expired. Please request a new one.' },
@@ -90,7 +94,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      console.error('[VERIFY-OTP] Supabase error:', error.message);
       return NextResponse.json(
         { error: 'Verification failed. Please try again.' },
         { status: 400 }
@@ -111,6 +114,8 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Success ─────────────────────────────────────────────────────────────
+    console.log('[VERIFY-OTP] Email verified for:', normalizedEmail);
+
     return NextResponse.json({
       success: true,
       message: 'Email verified successfully! You can now sign in.',

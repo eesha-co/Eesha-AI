@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { getAuthUserId } from '@/lib/api-auth';
+import { getAuthUserId, unauthorizedResponse } from '@/lib/api-auth';
 
 export const runtime = 'nodejs';
 
@@ -20,7 +20,9 @@ const BINARY_EXTENSIONS = new Set([
 
 function safePath(relativePath: string): string {
   const resolved = path.resolve(WORKSPACE_ROOT, relativePath);
-  if (!resolved.startsWith(WORKSPACE_ROOT)) {
+  // Must start with WORKSPACE_ROOT + path separator to prevent 
+  // bypass via similarly-named directories (e.g., /app/workspace-evil/)
+  if (!resolved.startsWith(WORKSPACE_ROOT + path.sep) && resolved !== WORKSPACE_ROOT) {
     throw new Error('Path traversal detected');
   }
   return resolved;
@@ -61,9 +63,9 @@ interface FileEntry {
 // GET — list directory or read file
 export async function GET(req: NextRequest) {
   // ━━━ SECURITY: Authenticate user ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const userId = await getAuthUserId() || "anonymous";
+  const userId = await getAuthUserId();
   if (!userId) {
-    
+    return unauthorizedResponse();
   }
 
   try {
@@ -150,16 +152,16 @@ export async function GET(req: NextRequest) {
     }
   } catch (error) {
     console.error('Workspace GET error:', error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 // POST — create file or directory
 export async function POST(req: NextRequest) {
   // ━━━ SECURITY: Authenticate user ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const userId = await getAuthUserId() || "anonymous";
+  const userId = await getAuthUserId();
   if (!userId) {
-    
+    return unauthorizedResponse();
   }
 
   try {
@@ -187,16 +189,16 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error('Workspace POST error:', error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 // PUT — update file content
 export async function PUT(req: NextRequest) {
   // ━━━ SECURITY: Authenticate user ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const userId = await getAuthUserId() || "anonymous";
+  const userId = await getAuthUserId();
   if (!userId) {
-    
+    return unauthorizedResponse();
   }
 
   try {
@@ -213,16 +215,16 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ success: true, path: filePath });
   } catch (error) {
     console.error('Workspace PUT error:', error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 // DELETE — delete file or directory
 export async function DELETE(req: NextRequest) {
   // ━━━ SECURITY: Authenticate user ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const userId = await getAuthUserId() || "anonymous";
+  const userId = await getAuthUserId();
   if (!userId) {
-    
+    return unauthorizedResponse();
   }
 
   try {
@@ -244,7 +246,7 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true, path: filePath });
   } catch (error) {
     console.error('Workspace DELETE error:', error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 

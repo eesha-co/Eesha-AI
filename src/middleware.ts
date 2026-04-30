@@ -10,6 +10,7 @@ interface RateLimitEntry {
 }
 
 const rateLimitMap = new Map<string, RateLimitEntry>();
+const RATE_LIMIT_MAX_ENTRIES = 10000; // Prevent unbounded memory growth
 
 // Rate limit configurations per endpoint type
 // Anonymous users get LOWER limits; authenticated users get FULL limits
@@ -54,6 +55,11 @@ function checkRateLimit(identifier: string, endpointType: string, isAnonymous: b
   const entry = rateLimitMap.get(key);
 
   if (!entry || now > entry.resetTime) {
+    // Prevent memory leak: evict oldest entries if map is too large
+    if (rateLimitMap.size >= RATE_LIMIT_MAX_ENTRIES) {
+      const oldestKey = rateLimitMap.keys().next().value;
+      if (oldestKey) rateLimitMap.delete(oldestKey);
+    }
     rateLimitMap.set(key, { count: 1, resetTime: now + config.windowMs });
     return { allowed: true };
   }
@@ -136,6 +142,38 @@ export async function middleware(request: NextRequest) {
   ) {
     const response = NextResponse.next();
     return addSecurityHeaders(response);
+  }
+
+  // ── CSRF Protection: Validate origin for state-changing requests ────
+  const method = request.method;
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && pathname.startsWith('/api/')) {
+    const origin = request.headers.get('origin');
+    const host = request.headers.get('host');
+
+    // Allow requests with no origin (same-origin, mobile apps, curl)
+    // But block requests with a mismatched origin
+    if (origin) {
+      try {
+        const originUrl = new URL(origin);
+        const allowedHosts = [
+          host, // Current host
+          'localhost:3000',
+          'fuhaddesmond-eesha-ai.hf.space',
+        ].filter(Boolean);
+
+        if (!allowedHosts.includes(originUrl.host)) {
+          return NextResponse.json(
+            { error: 'Invalid origin. Possible CSRF attack blocked.' },
+            { status: 403 }
+          );
+        }
+      } catch {
+        return NextResponse.json(
+          { error: 'Invalid origin header.' },
+          { status: 403 }
+        );
+      }
+    }
   }
 
   // ── Always allow the home page and auth routes ────────────────────────

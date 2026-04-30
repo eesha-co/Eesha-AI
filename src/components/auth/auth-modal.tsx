@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { signIn, getProviders } from 'next-auth/react';
-import { X, Github, Chrome, Mail, Zap, Shield, Infinity, MessageSquare, Code2, Terminal } from 'lucide-react';
+import { X, Github, Mail, Zap, Shield, Infinity, MessageSquare, Code2, Terminal } from 'lucide-react';
 import { useChatStore } from '@/stores/chat-store';
 
 interface ProviderInfo {
@@ -50,9 +50,8 @@ export function AuthModal() {
   };
 
   const hasGithub = !!providers['github'];
-  const hasGoogle = !!providers['google'];
   const hasEmail = !!providers['email'];
-  const hasAnyProvider = hasGithub || hasGoogle || hasEmail;
+  const hasAnyProvider = hasGithub || hasEmail;
 
   const creditsRemaining = Math.max(0, FREE_TIER_MAX - freeCreditsUsed);
   const isCreditExpired = freeCreditsUsed >= FREE_TIER_MAX;
@@ -157,18 +156,6 @@ export function AuthModal() {
 
                 {/* Auth providers */}
                 <div className="space-y-3">
-                  {/* Google */}
-                  {hasGoogle && (
-                    <button
-                      onClick={() => handleSignIn('google')}
-                      disabled={isLoading}
-                      className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition-all hover:bg-white/10 hover:border-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Chrome className="size-5" />
-                      Continue with Google
-                    </button>
-                  )}
-
                   {/* GitHub */}
                   {hasGithub && (
                     <button
@@ -184,7 +171,7 @@ export function AuthModal() {
                   {/* Email / Magic Link */}
                   {hasEmail && (
                     <>
-                      {(hasGithub || hasGoogle) && (
+                      {hasGithub && (
                         <div className="relative my-3">
                           <div className="absolute inset-0 flex items-center">
                             <div className="w-full border-t border-white/10" />

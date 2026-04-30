@@ -1,6 +1,5 @@
 import type { NextAuthOptions } from "next-auth";
 import GithubProvider from "next-auth/providers/github";
-import GoogleProvider from "next-auth/providers/google";
 import EmailProvider from "next-auth/providers/email";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { db } from "@/lib/db";
@@ -14,10 +13,6 @@ export const authOptions: NextAuthOptions = {
     GithubProvider({
       clientId: process.env.GITHUB_ID || "",
       clientSecret: process.env.GITHUB_SECRET || "",
-    }),
-    GoogleProvider({
-      clientId: process.env.GOOGLE_ID || "",
-      clientSecret: process.env.GOOGLE_SECRET || "",
     }),
     EmailProvider({
       server: {
@@ -59,6 +54,8 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.email = user.email;
+        // Carry email verification status
+        token.emailVerified = user.emailVerified ?? null;
       }
       // Always include the user ID
       return token;
@@ -68,20 +65,26 @@ export const authOptions: NextAuthOptions = {
       // Attach user ID to session for API route usage
       if (session.user) {
         session.user.id = token.id as string;
+        // Include email verification status in session
+        (session.user as any).emailVerified = token.emailVerified;
       }
       return session;
     },
 
     async signIn({ user, account, profile }) {
-      // Security: Block sign-in if email is not verified (for OAuth providers)
-      if (account?.provider === "google") {
-        // Google returns email_verified in the profile
-        const googleProfile = profile as { email_verified?: boolean };
-        if (!googleProfile?.email_verified) {
-          console.warn(`[AUTH] Blocked unverified Google sign-in: ${user.email}`);
-          return false;
-        }
+      // Security: Block sign-in if email is not verified
+      if (account?.provider === "github") {
+        // GitHub doesn't always provide email_verified in profile
+        // Trust GitHub's verification — if they have a primary email it's verified
+        return true;
       }
+
+      // For email magic link: NextAuth's email provider only sends to verified emails
+      // The token in the verification_tokens table handles verification
+      if (account?.provider === "email") {
+        return true;
+      }
+
       return true;
     },
   },

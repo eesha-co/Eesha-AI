@@ -1,8 +1,9 @@
 import type { NextAuthOptions } from "next-auth";
 import GithubProvider from "next-auth/providers/github";
-import EmailProvider from "next-auth/providers/email";
+import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { db } from "@/lib/db";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 export const authOptions: NextAuthOptions = {
   // ─── Database Adapter ────────────────────────────────────────────────────
@@ -10,20 +11,91 @@ export const authOptions: NextAuthOptions = {
 
   // ─── Authentication Providers ─────────────────────────────────────────────
   providers: [
+    // GitHub OAuth — trusted provider, email is pre-verified by GitHub
     GithubProvider({
       clientId: process.env.GITHUB_ID || "",
       clientSecret: process.env.GITHUB_SECRET || "",
     }),
-    EmailProvider({
-      server: {
-        host: process.env.EMAIL_SERVER_HOST || "",
-        port: Number(process.env.EMAIL_SERVER_PORT) || 587,
-        auth: {
-          user: process.env.EMAIL_SERVER_USER || "",
-          pass: process.env.EMAIL_SERVER_PASSWORD || "",
-        },
+
+    // Email + Password credentials — verified against Supabase Auth
+    // This replaces the old "magic link" email provider for better security
+    CredentialsProvider({
+      id: "credentials",
+      name: "Email and Password",
+      credentials: {
+        email: { label: "Email", type: "email", placeholder: "you@example.com" },
+        password: { label: "Password", type: "password" },
       },
-      from: process.env.EMAIL_FROM || "noreply@eesha-ai.com",
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error("Email and password are required.");
+        }
+
+        const email = credentials.email.toLowerCase().trim();
+
+        try {
+          // ── Verify credentials against Supabase Auth ──────────────────────
+          const supabase = createServerSupabaseClient();
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password: credentials.password,
+          });
+
+          if (error) {
+            // Map common errors to user-friendly messages
+            if (error.message.includes('Invalid login credentials')) {
+              throw new Error("Invalid email or password.");
+            }
+            throw new Error("Login failed. Please try again.");
+          }
+
+          if (!data.user) {
+            throw new Error("Invalid email or password.");
+          }
+
+          // ── CRITICAL: Check email verification ────────────────────────────
+          if (!data.user.email_confirmed_at) {
+            throw new Error("EMAIL_NOT_VERIFIED");
+          }
+
+          // ── Find or create user in our Prisma DB ──────────────────────────
+          let user = await db.user.findUnique({
+            where: { email },
+          });
+
+          if (!user) {
+            // Edge case: user exists in Supabase but not in our DB yet
+            user = await db.user.create({
+              data: {
+                id: data.user.id,
+                email,
+                name: email.split("@")[0],
+                emailVerified: new Date(data.user.email_confirmed_at),
+              },
+            });
+          } else if (!user.emailVerified && data.user.email_confirmed_at) {
+            // Update verification status if it was pending
+            await db.user.update({
+              where: { id: user.id },
+              data: { emailVerified: new Date(data.user.email_confirmed_at) },
+            });
+          }
+
+          return {
+            id: data.user.id,
+            email: data.user.email,
+            name: user.name || email.split("@")[0],
+            image: user.image,
+            emailVerified: data.user.email_confirmed_at ? new Date(data.user.email_confirmed_at) : null,
+          };
+        } catch (error: unknown) {
+          // Re-throw known errors
+          if (error instanceof Error) {
+            throw error;
+          }
+          throw new Error("An unexpected error occurred during login.");
+        }
+      },
     }),
   ],
 
@@ -41,8 +113,6 @@ export const authOptions: NextAuthOptions = {
 
   // ─── Pages ────────────────────────────────────────────────────────────────
   // We use a MODAL-based auth flow (like ChatGPT), not a separate login page.
-  // The AuthModal component handles login/signup inline on the main page.
-  // NextAuth defaults to its own built-in sign-in page if needed.
   pages: {
     error: "/",
   },
@@ -50,19 +120,18 @@ export const authOptions: NextAuthOptions = {
   // ─── Callbacks ────────────────────────────────────────────────────────────
   callbacks: {
     async jwt({ token, user, account }) {
-      // First time signing in — add user ID to token
+      // First time signing in — add user info to token
       if (user) {
         token.id = user.id;
         token.email = user.email;
         // Carry email verification status
         token.emailVerified = user.emailVerified ?? null;
       }
-      // Always include the user ID
       return token;
     },
 
     async session({ session, token }) {
-      // Attach user ID to session for API route usage
+      // Attach user info to session for API route usage
       if (session.user) {
         session.user.id = token.id as string;
         // Include email verification status in session
@@ -73,15 +142,17 @@ export const authOptions: NextAuthOptions = {
 
     async signIn({ user, account, profile }) {
       // Security: Block sign-in if email is not verified
+
       if (account?.provider === "github") {
-        // GitHub doesn't always provide email_verified in profile
-        // Trust GitHub's verification — if they have a primary email it's verified
+        // GitHub OAuth — GitHub verifies emails, so we trust it
+        // But if the user already has an account with unverified email,
+        // we should still allow GitHub sign-in since GitHub has verified the email
         return true;
       }
 
-      // For email magic link: NextAuth's email provider only sends to verified emails
-      // The token in the verification_tokens table handles verification
-      if (account?.provider === "email") {
+      if (account?.provider === "credentials") {
+        // Credentials provider — email verification is already checked
+        // in the authorize() function above (throws EMAIL_NOT_VERIFIED)
         return true;
       }
 

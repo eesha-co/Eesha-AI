@@ -191,17 +191,42 @@ export async function middleware(request: NextRequest) {
   });
 
   const isAuthenticated = !!token;
+  const isEmailVerified = isAuthenticated ? !!token.emailVerified : false;
   const userId = isAuthenticated ? (token.id as string) : getAnonymousId(request);
 
   // ── API Routes: allow anonymous access with stricter limits ─────────────
   if (pathname.startsWith("/api/")) {
+    // Skip auth checks for auth-related routes (signup, verify, resend)
+    if (pathname.startsWith("/api/auth/signup") ||
+        pathname.startsWith("/api/auth/verify-otp") ||
+        pathname.startsWith("/api/auth/resend-otp")) {
+      const response = NextResponse.next();
+      return addSecurityHeaders(response);
+    }
+
     const endpointType = getEndpointType(pathname);
 
-    // Terminal: AUTHENTICATED ONLY — never allow anonymous
+    // Terminal: AUTHENTICATED + VERIFIED ONLY — never allow anonymous or unverified
     if (endpointType === "terminal" && !isAuthenticated) {
       return NextResponse.json(
         { error: "SIGN_IN_REQUIRED", message: "Terminal access requires sign-in. Please create a free account to continue." },
         { status: 401 }
+      );
+    }
+
+    // Workspace: AUTHENTICATED + VERIFIED ONLY — block unverified email users
+    if (endpointType === "workspace" && isAuthenticated && !isEmailVerified) {
+      return NextResponse.json(
+        { error: "EMAIL_NOT_VERIFIED", message: "Please verify your email to access this feature. Check your inbox for the verification code." },
+        { status: 403 }
+      );
+    }
+
+    // Terminal: Also block unverified email users
+    if (endpointType === "terminal" && isAuthenticated && !isEmailVerified) {
+      return NextResponse.json(
+        { error: "EMAIL_NOT_VERIFIED", message: "Please verify your email to access the terminal. Check your inbox for the verification code." },
+        { status: 403 }
       );
     }
 

@@ -18,6 +18,13 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
+# NEXT_PUBLIC_ vars must be available at BUILD TIME for Next.js client bundle
+# The anon key is safe to expose publicly (it's designed for browser use with RLS)
+ARG NEXT_PUBLIC_SUPABASE_URL=https://xydfeerrrtlgrxmtepjo.supabase.co
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5ZGZlZXJycnRsZ3J4bXRlcGpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0ODA4NzksImV4cCI6MjA5MzA1Njg3OX0.s61rGFJe4sw7zcUnD754Y9Mswy3V0VcouA0Pa3HNWrs
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+
 # Build Next.js
 RUN npm run build
 

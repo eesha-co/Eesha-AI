@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
 
 /**
  * POST /api/setup/update-email-template
@@ -7,14 +6,13 @@ import { db } from '@/lib/db';
  * One-time setup endpoint to update the Supabase email template
  * from sending verification LINKS to sending 6-digit OTP CODES.
  *
- * This modifies the GoTrue auth config in the database directly.
- * The template is changed to use {{ .Token }} instead of {{ .ConfirmationURL }}.
+ * This uses a DIRECT PostgreSQL connection (not the pooler) because
+ * auth.config requires a session-level connection.
  *
- * SECURITY: This endpoint is protected by a setup secret.
- * Call it once after deployment, then it can be disabled.
+ * SECURITY: Protected by NEXTAUTH_SECRET.
  */
 
-// OTP email template — uses {{ .Token }} for 6-digit code instead of {{ .ConfirmationURL }}
+// OTP email template — uses {{ .Token }} for 6-digit code
 const SIGNUP_OTP_TEMPLATE = `<h2>Confirm your signup</h2>
 <p>Enter this 6-digit code to verify your email:</p>
 <div style="padding: 16px; background: #f3f4f6; border-radius: 8px; text-align: center; font-size: 32px; letter-spacing: 8px; font-weight: bold; font-family: monospace;">{{ .Token }}</div>
@@ -24,6 +22,38 @@ const MAGIC_LINK_OTP_TEMPLATE = `<h2>Your verification code</h2>
 <p>Enter this 6-digit code to verify your identity:</p>
 <div style="padding: 16px; background: #f3f4f6; border-radius: 8px; text-align: center; font-size: 32px; letter-spacing: 8px; font-weight: bold; font-family: monospace;">{{ .Token }}</div>
 <p style="color: #6b7280; font-size: 14px;">This code expires in 24 hours. If you did not request this, please ignore this email.</p>`;
+
+interface QueryResult {
+  success: boolean;
+  message: string;
+}
+
+async function executeAuthConfigUpdate(
+  directUrl: string,
+  name: string,
+  value: string
+): Promise<QueryResult> {
+  // Dynamic import of pg since it might not be available
+  let pg: any;
+  try {
+    pg = await import('pg');
+  } catch {
+    return { success: false, message: 'pg module not available' };
+  }
+
+  const pool = new pg.Pool({ connectionString: directUrl, ssl: { rejectUnauthorized: false } });
+  try {
+    await pool.query(
+      `UPDATE auth.config SET value = $1 WHERE name = $2`,
+      [value, name]
+    );
+    return { success: true, message: `Updated ${name}` };
+  } catch (e: any) {
+    return { success: false, message: `${name}: ${e.message}` };
+  } finally {
+    await pool.end();
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,67 +68,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const directUrl = process.env.DIRECT_URL;
+    if (!directUrl) {
+      return NextResponse.json(
+        { error: 'DIRECT_URL environment variable is required.' },
+        { status: 500 }
+      );
+    }
+
+    const siteUrl = process.env.NEXTAUTH_URL || 'https://fuhaddesmond-eesha-ai.hf.space';
     const results: string[] = [];
 
-    // ── Update "Confirm signup" email template to use OTP code ──────────────
-    try {
-      await db.$executeRawUnsafe(`
-        UPDATE auth.config
-        SET value = $1
-        WHERE name = 'mailer_signup_template'
-      `, SIGNUP_OTP_TEMPLATE);
-      results.push('Updated mailer_signup_template to use OTP code');
-    } catch (e: any) {
-      results.push(`mailer_signup_template: ${e.message}`);
-    }
+    // ── Update all email templates and auth config ──────────────────────────
+    const updates = [
+      { name: 'mailer_signup_template', value: SIGNUP_OTP_TEMPLATE },
+      { name: 'mailer_magiclink_template', value: MAGIC_LINK_OTP_TEMPLATE },
+      { name: 'site_url', value: siteUrl },
+      { name: 'uri_allow_list', value: `${siteUrl}/**` },
+      { name: 'mailer_otp_length', value: '6' },
+    ];
 
-    // ── Update "Magic Link" email template to use OTP code ──────────────────
-    try {
-      await db.$executeRawUnsafe(`
-        UPDATE auth.config
-        SET value = $1
-        WHERE name = 'mailer_magiclink_template'
-      `, MAGIC_LINK_OTP_TEMPLATE);
-      results.push('Updated mailer_magiclink_template to use OTP code');
-    } catch (e: any) {
-      results.push(`mailer_magiclink_template: ${e.message}`);
-    }
-
-    // ── Update site URL to the HF Space URL ─────────────────────────────────
-    const siteUrl = process.env.NEXTAUTH_URL || 'https://fuhaddesmond-eesha-ai.hf.space';
-    try {
-      await db.$executeRawUnsafe(`
-        UPDATE auth.config
-        SET value = $1
-        WHERE name = 'site_url'
-      `, siteUrl);
-      results.push(`Updated site_url to ${siteUrl}`);
-    } catch (e: any) {
-      results.push(`site_url: ${e.message}`);
-    }
-
-    // ── Update URI allow list for redirects ─────────────────────────────────
-    try {
-      await db.$executeRawUnsafe(`
-        UPDATE auth.config
-        SET value = $1
-        WHERE name = 'uri_allow_list'
-      `, `${siteUrl}/**`);
-      results.push('Updated uri_allow_list');
-    } catch (e: any) {
-      results.push(`uri_allow_list: ${e.message}`);
-    }
-
-    // ── Set OTP length to 6 digits ──────────────────────────────────────────
-    try {
-      await db.$executeRawUnsafe(`
-        UPDATE auth.config
-        SET value = '6'
-        WHERE name = 'mailer_otp_length'
-      `);
-      results.push('Set OTP length to 6 digits');
-    } catch (e: any) {
-      results.push(`mailer_otp_length: ${e.message}`);
+    for (const update of updates) {
+      const result = await executeAuthConfigUpdate(directUrl, update.name, update.value);
+      results.push(result.success ? `OK: ${result.message}` : `FAIL: ${result.message}`);
     }
 
     return NextResponse.json({

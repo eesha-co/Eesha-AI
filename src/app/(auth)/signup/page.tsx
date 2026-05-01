@@ -16,7 +16,7 @@ interface ProviderInfo {
   name: string;
 }
 
-type Step = 'email' | 'password' | 'policy' | 'verify' | 'success';
+type Step = 'email' | 'username' | 'password' | 'policy' | 'verify' | 'success';
 
 // ─── Password Strength Indicator ──────────────────────────────────────────────
 function getPasswordStrength(password: string): {
@@ -95,6 +95,7 @@ function OTPInput({ value, onChange, disabled, digits = 8 }: {
 function getStepLabel(step: Step): string {
   switch (step) {
     case 'email': return 'Email';
+    case 'username': return 'Username';
     case 'password': return 'Password';
     case 'policy': return 'Agreement';
     case 'verify': return 'Verify';
@@ -112,6 +113,7 @@ export default function SignupPage() {
 
   // Form fields
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [agreedToPolicy, setAgreedToPolicy] = useState(false);
@@ -145,10 +147,24 @@ export default function SignupPage() {
       setError('Please enter a valid email address.');
       return;
     }
+    setStep('username');
+  };
+
+  // ── Step 2: Username ─────────────────────────────────────────────────────
+  const handleUsernameNext = () => {
+    setError('');
+    if (!username.trim() || username.trim().length < 3) {
+      setError('Username must be at least 3 characters.');
+      return;
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(username.trim())) {
+      setError('Username can only contain letters, numbers, underscores, and hyphens.');
+      return;
+    }
     setStep('password');
   };
 
-  // ── Step 2: Password validation & next ───────────────────────────────────
+  // ── Step 3: Password validation & next ───────────────────────────────────
   const handlePasswordNext = () => {
     setError('');
     if (password.length < 8) {
@@ -170,7 +186,7 @@ export default function SignupPage() {
     setStep('policy');
   };
 
-  // ── Step 3: Policy agreement & submit sign-up ────────────────────────────
+  // ── Step 4: Policy agreement & submit sign-up ────────────────────────────
   const handlePolicySubmit = async () => {
     setError('');
     if (!agreedToPolicy) {
@@ -183,7 +199,7 @@ export default function SignupPage() {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, agreedToPolicy }),
+        body: JSON.stringify({ email, password, username: username.trim(), agreedToPolicy }),
       });
 
       const data = await res.json();
@@ -223,7 +239,7 @@ export default function SignupPage() {
     }
   };
 
-  // ── Step 4: Verify OTP ───────────────────────────────────────────────────
+  // ── Step 5: Verify OTP ───────────────────────────────────────────────────
   const handleVerifyOtp = async () => {
     setError('');
     if (otp.length !== 8) {
@@ -287,11 +303,11 @@ export default function SignupPage() {
   };
 
   // ── Step indicator ───────────────────────────────────────────────────────
-  const signupSteps: Step[] = ['email', 'password', 'policy', 'verify', 'success'];
+  const signupSteps: Step[] = ['email', 'username', 'password', 'policy', 'verify', 'success'];
   const currentStepIndex = signupSteps.indexOf(step);
 
   const StepIndicator = () => {
-    const visibleSteps: Step[] = ['email', 'password', 'policy', 'verify'];
+    const visibleSteps: Step[] = ['email', 'username', 'password', 'policy', 'verify'];
     const activeIndex = step === 'success' ? 4 : currentStepIndex;
 
     return (
@@ -500,7 +516,51 @@ export default function SignupPage() {
               </motion.div>
             )}
 
-            {/* Step 2: Password */}
+            {/* Step 2: Username */}
+            {step === 'username' && (
+              <motion.div
+                key="username"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-zinc-400">Choose a username</label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">@</span>
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => { setUsername(e.target.value.replace(/[^a-zA-Z0-9_-]/g, '')); setError(''); }}
+                      placeholder="your_username"
+                      autoFocus
+                      className="w-full rounded-xl border border-white/10 bg-white/5 py-3.5 pl-9 pr-4 text-sm text-white placeholder-zinc-500 outline-none transition-all focus:border-violet-500/50 focus:bg-white/10 focus:ring-2 focus:ring-violet-500/30"
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-zinc-500">This will be your display name. 3+ characters, letters, numbers, underscores, hyphens.</p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setStep('email'); setError(''); }}
+                    className="rounded-xl border border-white/10 bg-white/5 px-5 py-3.5 text-sm text-zinc-400 transition-all hover:bg-white/10"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={handleUsernameNext}
+                    disabled={username.trim().length < 3}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-cyan-600 px-4 py-3.5 text-sm font-semibold text-white transition-all hover:from-violet-500 hover:to-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Continue
+                    <ArrowRight className="size-4" />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step 3: Password */}
             {step === 'password' && (
               <motion.div
                 key="password"
@@ -562,7 +622,7 @@ export default function SignupPage() {
 
                 <div className="flex gap-3">
                   <button
-                    onClick={() => { setStep('email'); setError(''); }}
+                    onClick={() => { setStep('username'); setError(''); }}
                     className="rounded-xl border border-white/10 bg-white/5 px-5 py-3.5 text-sm text-zinc-400 transition-all hover:bg-white/10"
                   >
                     Back
@@ -579,7 +639,7 @@ export default function SignupPage() {
               </motion.div>
             )}
 
-            {/* Step 3: Policy Agreement */}
+            {/* Step 4: Policy Agreement */}
             {step === 'policy' && (
               <motion.div
                 key="policy"
@@ -594,6 +654,11 @@ export default function SignupPage() {
                   <div className="flex items-center gap-2.5 text-sm text-zinc-300">
                     <Mail className="size-4 text-violet-400" />
                     <span className="truncate">{email}</span>
+                    <Check className="size-3.5 text-emerald-400 ml-auto" />
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm text-zinc-300">
+                    <span className="size-4 text-center text-cyan-400 font-bold text-xs">@</span>
+                    <span>{username}</span>
                     <Check className="size-3.5 text-emerald-400 ml-auto" />
                   </div>
                   <div className="flex items-center gap-2.5 text-sm text-zinc-300">
@@ -655,7 +720,7 @@ export default function SignupPage() {
               </motion.div>
             )}
 
-            {/* Step 4: OTP Verification */}
+            {/* Step 5: OTP Verification */}
             {step === 'verify' && (
               <motion.div
                 key="verify"
@@ -719,7 +784,7 @@ export default function SignupPage() {
               </motion.div>
             )}
 
-            {/* Step 5: Success */}
+            {/* Step 6: Success */}
             {step === 'success' && (
               <motion.div
                 key="success"

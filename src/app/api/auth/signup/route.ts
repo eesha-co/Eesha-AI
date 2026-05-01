@@ -61,7 +61,7 @@ async function findUserByEmail(adminClient: ReturnType<typeof createServerSupaba
 
 // ─── Helper: Create Prisma DB record (best-effort) ──────────────────────────
 // Also saves a bcrypt hash of the password as a backup.
-async function ensureDbUser(userId: string, email: string, emailVerified: Date | null, plainPassword?: string) {
+async function ensureDbUser(userId: string, email: string, emailVerified: Date | null, plainPassword?: string, username?: string) {
   try {
     const { db } = await import('@/lib/db');
 
@@ -76,7 +76,7 @@ async function ensureDbUser(userId: string, email: string, emailVerified: Date |
       create: {
         id: userId,
         email,
-        name: email.split('@')[0],
+        name: username || email.split('@')[0],
         emailVerified,
         passwordHash,
       },
@@ -170,7 +170,7 @@ async function verifyAndFixPassword(
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, agreedToPolicy } = body;
+    const { email, password, username, agreedToPolicy } = body;
 
     // ── Input validation ────────────────────────────────────────────────────
     if (!email || typeof email !== 'string') {
@@ -197,6 +197,12 @@ export async function POST(request: NextRequest) {
     }
     if (!agreedToPolicy) {
       return NextResponse.json({ error: 'You must agree to the Eesha AI Privacy Policy and Terms of Service.' }, { status: 400 });
+    }
+    if (username && typeof username !== 'string') {
+      return NextResponse.json({ error: 'Invalid username format.' }, { status: 400 });
+    }
+    if (username && (username.length < 3 || !/^[a-zA-Z0-9_-]+$/.test(username))) {
+      return NextResponse.json({ error: 'Username must be at least 3 characters and contain only letters, numbers, underscores, or hyphens.' }, { status: 400 });
     }
 
     // ── Rate limiting ───────────────────────────────────────────────────────
@@ -261,6 +267,7 @@ export async function POST(request: NextRequest) {
       password,
       options: {
         data: {
+          username: username || undefined,
           agreed_to_policy: true,
           agreed_at: new Date().toISOString(),
         },
@@ -291,6 +298,7 @@ export async function POST(request: NextRequest) {
           password,
           options: {
             data: {
+              username: username || undefined,
               agreed_to_policy: true,
               agreed_at: new Date().toISOString(),
             },
@@ -300,7 +308,7 @@ export async function POST(request: NextRequest) {
         if (retryError) {
           console.error('[SIGNUP] Retry signUp also failed:', retryError.message);
           console.log('[SIGNUP] Trying admin fallback');
-          return await adminFallbackSignup(adminClient, signupClient, normalizedEmail, password, retryUser);
+          return await adminFallbackSignup(adminClient, signupClient, normalizedEmail, password, retryUser, username);
         }
 
         // Retry succeeded — verify password was saved
@@ -309,7 +317,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: pwCheck.error || 'Password could not be saved. Please try again.' }, { status: 500 });
         }
 
-        return handleSuccessfulSignup(retryData, normalizedEmail, pwCheck.userId, password);
+        return handleSuccessfulSignup(retryData, normalizedEmail, pwCheck.userId, password, username);
       }
 
       if (signUpError.message.toLowerCase().includes('rate limit') || signUpError.message.toLowerCase().includes('too many')) {
@@ -335,7 +343,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── signUp() returned without error ────────────────────────────────────
-    return handleSuccessfulSignup(signUpData, normalizedEmail, pwCheck.userId, password);
+    return handleSuccessfulSignup(signUpData, normalizedEmail, pwCheck.userId, password, username);
 
   } catch (error) {
     console.error('[SIGNUP] Unexpected error:', error instanceof Error ? error.message : error);
@@ -349,7 +357,8 @@ function handleSuccessfulSignup(
   signUpData: { user?: { id?: string; email_confirmed_at?: string; identities?: unknown[] } | null; session?: unknown },
   email: string,
   verifiedUserId?: string,
-  password?: string
+  password?: string,
+  username?: string
 ) {
   if (!signUpData?.user) {
     console.error('[SIGNUP] signUp returned no error but no user object');
@@ -372,7 +381,7 @@ function handleSuccessfulSignup(
     console.log('[SIGNUP] User auto-confirmed:', email);
     const userId = verifiedUserId || signUpData.user.id;
     if (userId) {
-      ensureDbUser(userId, email, new Date(), password);
+      ensureDbUser(userId, email, new Date(), password, username);
     }
     return NextResponse.json({
       success: true,
@@ -386,7 +395,7 @@ function handleSuccessfulSignup(
   console.log('[SIGNUP] Success: user created + OTP sent + password verified for:', email);
   const userId = verifiedUserId || signUpData.user.id;
   if (userId) {
-    ensureDbUser(userId, email, null, password);
+    ensureDbUser(userId, email, null, password, username);
   }
 
   return NextResponse.json({
@@ -403,7 +412,8 @@ async function adminFallbackSignup(
   signupClient: ReturnType<typeof createSignupClient>,
   email: string,
   password: string,
-  existingUser: { id?: string } | null
+  existingUser: { id?: string } | null,
+  username?: string
 ) {
   try {
     let userId = existingUser?.id;
@@ -420,6 +430,7 @@ async function adminFallbackSignup(
         password,
         email_confirm: false,
         user_metadata: {
+          username: username || undefined,
           agreed_to_policy: true,
           agreed_at: new Date().toISOString(),
         },
@@ -440,6 +451,7 @@ async function adminFallbackSignup(
       const { error: updateError } = await adminClient.auth.admin.updateUserById(userId, {
         password,
         user_metadata: {
+          username: username || undefined,
           agreed_to_policy: true,
           agreed_at: new Date().toISOString(),
         },
@@ -472,7 +484,7 @@ async function adminFallbackSignup(
     }
 
     if (userId) {
-      ensureDbUser(userId, email, null, password);
+      ensureDbUser(userId, email, null, password, username);
     }
 
     console.log('[SIGNUP] Admin fallback: OTP sent + password set for:', email);

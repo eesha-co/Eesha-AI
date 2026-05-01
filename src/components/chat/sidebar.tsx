@@ -3,10 +3,11 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useChatStore, ThemeMode, Conversation } from '@/stores/chat-store';
-import { Plus, MessageSquare, Trash2, PanelLeftClose, Search, Settings, X, Zap, Sun, Moon, Monitor, LogOut, User } from 'lucide-react';
+import { Plus, MessageSquare, Trash2, PanelLeftClose, Search, Settings, X, Zap, Sun, Moon, Monitor, LogOut, User, LogIn, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useSession, signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -86,6 +87,7 @@ export function Sidebar() {
   } = useChatStore();
 
   const { data: session } = useSession();
+  const router = useRouter();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null);
@@ -243,33 +245,50 @@ export function Sidebar() {
               <ThemeToggle />
             </div>
 
-            {/* User info section */}
-            {session?.user && (
-              <div className="mb-2 flex items-center gap-2.5 rounded-lg bg-white/5 dark:bg-white/5 px-2.5 py-2">
-                <div className="flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-cyan-600 text-xs font-bold text-white">
+            {session?.user ? (
+              /* ── Authenticated: Username + sign out ── */
+              <div className="flex items-center gap-2.5 rounded-lg bg-white/5 dark:bg-white/5 px-2.5 py-2.5">
+                <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-cyan-600 text-sm font-bold text-white">
                   {session.user.name?.[0]?.toUpperCase() || <User className="size-4" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="truncate text-xs font-medium text-foreground">{session.user.name || 'User'}</p>
+                  <p className="truncate text-sm font-semibold text-foreground">{session.user.name || 'User'}</p>
                   <p className="truncate text-[10px] text-[var(--text-tertiary)]">{session.user.email}</p>
                 </div>
-              </div>
-            )}
-
-            <div className="flex items-center gap-2">
-              <button className="flex flex-1 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-accent hover:text-foreground">
-                <Settings className="size-4" />
-                Settings
-              </button>
-              {session && (
                 <button
                   onClick={handleSignOut}
-                  className="flex items-center gap-1 rounded-lg px-2.5 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-red-500/10 hover:text-red-400"
+                  className="shrink-0 rounded-lg p-1.5 text-[var(--text-secondary)] transition-colors hover:bg-red-500/10 hover:text-red-400"
                   title="Sign out"
                 >
                   <LogOut className="size-4" />
                 </button>
-              )}
+              </div>
+            ) : (
+              /* ── Not authenticated: Login & Sign Up ── */
+              <div className="space-y-2">
+                <Button
+                  onClick={() => router.push('/signup')}
+                  className="w-full justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-cyan-600 py-2.5 text-sm font-semibold text-white border-0 hover:from-violet-500 hover:to-cyan-500"
+                >
+                  <Sparkles className="size-4" />
+                  Sign up
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => router.push('/login')}
+                  className="w-full justify-center gap-2 rounded-xl py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent"
+                >
+                  <LogIn className="size-4" />
+                  Log in
+                </Button>
+              </div>
+            )}
+
+            <div className="mt-3 flex items-center gap-2">
+              <button className="flex flex-1 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-accent hover:text-foreground">
+                <Settings className="size-4" />
+                Settings
+              </button>
             </div>
             <div className="mt-2 flex items-center gap-2 px-2.5">
               <span className="relative flex size-2">

@@ -89,14 +89,14 @@ export default function Home() {
       {/* Main content area — TRANSPARENT background so canvas shows through */}
       <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden" style={{ zIndex: 1 }}>
         {/* Header bar — glass morphism, semi-transparent */}
-        <div className="flex h-11 shrink-0 items-center justify-between border-b border-white/5 dark:border-white/5 bg-background/60 dark:bg-black/40 px-3 backdrop-blur-xl">
+        <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/5 dark:border-white/5 bg-background/60 dark:bg-black/40 px-4 backdrop-blur-xl">
           <Header />
           <div className="flex items-center gap-1">
             {/* </> toggle — cycles: closed → workspace → terminal → closed */}
             <Button
               variant="ghost"
               size="icon"
-              className={`size-8 ${hasSidePanel ? 'bg-white/10 dark:bg-white/10 text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+              className={`size-9 ${hasSidePanel ? 'bg-white/10 dark:bg-white/10 text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
               onClick={() => {
                 if (!hasSidePanel) {
                   setShowWorkspace(true);
@@ -121,7 +121,7 @@ export default function Home() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-8 text-muted-foreground hover:text-foreground hover:bg-accent"
+                className="size-9 text-muted-foreground hover:text-foreground hover:bg-accent"
                 onClick={() => { setShowWorkspace(false); setShowTerminal(false); }}
                 title="Close Panel"
               >

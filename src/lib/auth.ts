@@ -127,7 +127,7 @@ export const authOptions: NextAuthOptions = {
           return {
             id: data.user.id,
             email: data.user.email,
-            name: user.name || email.split("@")[0],
+            name: data.user.user_metadata?.username || user.name || email.split("@")[0],
             image: user.image,
             emailVerified: data.user.email_confirmed_at ? new Date(data.user.email_confirmed_at) : null,
           };

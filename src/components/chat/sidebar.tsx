@@ -3,11 +3,10 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useChatStore, ThemeMode, Conversation } from '@/stores/chat-store';
-import { Plus, MessageSquare, Trash2, PanelLeftClose, Search, Settings, X, Zap, Sun, Moon, Monitor, LogOut, User, LogIn, Sparkles } from 'lucide-react';
+import { Plus, MessageSquare, Trash2, PanelLeftClose, Search, Settings, X, Sun, Moon, Monitor, LogOut, User, LogIn, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useSession, signOut } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -87,8 +86,6 @@ export function Sidebar() {
   } = useChatStore();
 
   const { data: session } = useSession();
-  const router = useRouter();
-
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null);
 
@@ -138,13 +135,7 @@ export function Sidebar() {
         <div className="flex h-full w-[280px] flex-col">
           {/* Header with branding */}
           <div className="flex items-center justify-between px-4 py-4">
-            <div className="flex items-center gap-2.5">
-              <img src="/splash-screen.png" alt="Eesha AI" className="h-10 w-auto object-contain" />
-              <span className="flex items-center gap-1 text-[10px] text-[var(--text-tertiary)]">
-                <Zap className="size-2.5 text-amber-500" />
-                Advanced AI Model
-              </span>
-            </div>
+            <img src="/splash-screen.png" alt="Eesha AI" className="h-10 w-auto object-contain" />
             <Button
               variant="ghost"
               size="icon"
@@ -267,7 +258,7 @@ export function Sidebar() {
               /* ── Not authenticated: Login & Sign Up ── */
               <div className="space-y-2">
                 <Button
-                  onClick={() => router.push('/signup')}
+                  onClick={() => window.location.href = '/signup'}
                   className="w-full justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-cyan-600 py-2.5 text-sm font-semibold text-white border-0 hover:from-violet-500 hover:to-cyan-500"
                 >
                   <Sparkles className="size-4" />
@@ -275,7 +266,7 @@ export function Sidebar() {
                 </Button>
                 <Button
                   variant="ghost"
-                  onClick={() => router.push('/login')}
+                  onClick={() => window.location.href = '/login'}
                   className="w-full justify-center gap-2 rounded-xl py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent"
                 >
                   <LogIn className="size-4" />

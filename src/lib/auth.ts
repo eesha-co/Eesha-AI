@@ -3,7 +3,7 @@ import GithubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { db } from "@/lib/db";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createSignupClient, createServerSupabaseClient } from "@/lib/supabase-server";
 
 export const authOptions: NextAuthOptions = {
   // ─── Database Adapter ────────────────────────────────────────────────────
@@ -35,13 +35,17 @@ export const authOptions: NextAuthOptions = {
 
         try {
           // ── Verify credentials against Supabase Auth ──────────────────────
-          const supabase = createServerSupabaseClient();
-          const { data, error } = await supabase.auth.signInWithPassword({
+          // CRITICAL: Use the anon key client (createSignupClient), NOT the
+          // service role client. The service role key does NOT support
+          // signInWithPassword() — it always returns "Invalid login credentials".
+          const signupClient = createSignupClient();
+          const { data, error } = await signupClient.auth.signInWithPassword({
             email,
             password: credentials.password,
           });
 
           if (error) {
+            console.error('[AUTH] signInWithPassword error:', error.message, '| status:', error.status);
             // Map common errors to user-friendly messages
             if (error.message.includes('Invalid login credentials')) {
               throw new Error("Invalid email or password.");
@@ -55,6 +59,7 @@ export const authOptions: NextAuthOptions = {
 
           // ── CRITICAL: Check email verification ────────────────────────────
           if (!data.user.email_confirmed_at) {
+            console.log('[AUTH] User email not verified:', email);
             throw new Error("EMAIL_NOT_VERIFIED");
           }
 
@@ -112,7 +117,6 @@ export const authOptions: NextAuthOptions = {
   },
 
   // ─── Pages ────────────────────────────────────────────────────────────────
-  // We use a MODAL-based auth flow (like ChatGPT), not a separate login page.
   pages: {
     error: "/",
   },
@@ -145,8 +149,6 @@ export const authOptions: NextAuthOptions = {
 
       if (account?.provider === "github") {
         // GitHub OAuth — GitHub verifies emails, so we trust it
-        // But if the user already has an account with unverified email,
-        // we should still allow GitHub sign-in since GitHub has verified the email
         return true;
       }
 

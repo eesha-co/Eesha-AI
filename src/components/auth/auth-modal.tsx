@@ -318,7 +318,24 @@ export function AuthModal() {
         redirect: false,
       });
       if (result?.error) {
-        setError('Invalid email or password.');
+        // Check account status for specific error message
+        try {
+          const statusRes = await fetch('/api/auth/check-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          const statusData = await statusRes.json();
+          if (statusData.status === 'unverified') {
+            setError('Your email has not been verified yet. Please check your email for a verification code.');
+          } else if (statusData.status === 'not_found') {
+            setError('No account found with this email. Please sign up first.');
+          } else {
+            setError('Invalid email or password.');
+          }
+        } catch {
+          setError('Invalid email or password.');
+        }
       } else if (result?.ok) {
         handleClose();
       }

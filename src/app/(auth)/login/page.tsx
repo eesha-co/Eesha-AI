@@ -58,8 +58,28 @@ export default function LoginPage() {
         callbackUrl: '/',
         redirect: false,
       });
+
       if (result?.error) {
-        setError('Invalid email or password.');
+        // Login failed — check the account status to give a specific error message
+        try {
+          const statusRes = await fetch('/api/auth/check-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          const statusData = await statusRes.json();
+
+          if (statusData.status === 'unverified') {
+            setError('Your email has not been verified yet. Please check your email for a verification code, or sign up again to get a new one.');
+          } else if (statusData.status === 'not_found') {
+            setError('No account found with this email. Please sign up first.');
+          } else {
+            setError('Invalid email or password. Please try again.');
+          }
+        } catch {
+          // If the status check also fails, show generic error
+          setError('Invalid email or password. Please try again.');
+        }
       } else if (result?.ok) {
         router.push('/');
       }

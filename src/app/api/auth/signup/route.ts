@@ -20,7 +20,22 @@ function checkSignupRateLimit(ip: string): { allowed: boolean; retryAfter?: numb
   return { allowed: true };
 }
 
-// ─── Helper: Find user by email across all pages ─────────────────────────────
+// ─── Helper: Check if error indicates user already exists ────────────────────
+function isAlreadyRegisteredError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes('already registered') ||
+    lower.includes('already been registered') ||
+    lower.includes('user already registered') ||
+    lower.includes('a user with this email') ||
+    lower.includes('duplicate') ||
+    lower.includes('unique constraint') ||
+    lower.includes('email has already been') ||
+    lower.includes('email address has already')
+  );
+}
+
+// ─── Helper: Find user by email via admin API ───────────────────────────────
 async function findUserByEmail(adminClient: ReturnType<typeof createServerSupabaseClient>, email: string) {
   let page = 1;
   const perPage = 50;
@@ -43,26 +58,41 @@ async function findUserByEmail(adminClient: ReturnType<typeof createServerSupaba
   return { user: null, error: null };
 }
 
+// ─── Helper: Create Prisma DB record (best-effort) ──────────────────────────
+async function ensureDbUser(userId: string, email: string, emailVerified: Date | null) {
+  try {
+    const { db } = await import('@/lib/db');
+    await db.user.upsert({
+      where: { email },
+      create: { id: userId, email, name: email.split('@')[0], emailVerified },
+      update: emailVerified ? { emailVerified } : {},
+    });
+  } catch (dbError) {
+    console.error('[SIGNUP] DB user creation failed (non-fatal):', dbError instanceof Error ? dbError.message : dbError);
+  }
+}
+
 // ─── POST /api/auth/signup ────────────────────────────────────────────────────
-// BULLETPROOF signup flow:
 //
-//   1. Validate input
-//   2. Rate limit
-//   3. Try signUp() with anon key — this is the primary path
-//      - If it works → user created, OTP sent, done!
-//      - If "already registered" → go to step 4
-//   4. User already exists — check with admin API:
+// ROBUST signup flow:
+//
+//   1. Validate input + rate limit
+//   2. Check if user already exists via admin API FIRST
 //      - If confirmed → "please log in"
-//      - If unconfirmed → DELETE the broken user, then signUp() again
+//      - If unconfirmed → DELETE the stale user so signUp() will work
+//   3. Call signUp() with anon key — creates user AND sends OTP
+//   4. Handle all edge cases:
+//      - signUp() success with identities → brand new user, OTP sent
+//      - signUp() success with empty identities → user existed, OTP NOT sent
+//      - signUp() error "already registered" → missed in step 2, retry after cleanup
+//      - signUp() other error → return meaningful error
 //   5. Create Prisma DB record (best-effort)
 //
-// Why delete + recreate instead of signInWithOtp()?
-//   - signInWithOtp({ shouldCreateUser: false }) fails unpredictably
-//     for admin-created or previously-failed unconfirmed users
-//   - admin.updateUserById + signUp() also fails if user exists
-//   - Deleting the unconfirmed user + calling signUp() fresh is the ONLY
-//     approach that guarantees both user creation AND OTP delivery
-//   - Unconfirmed users have no real data to lose
+// Why check admin API first before signUp()?
+//   - signUp() for an existing unconfirmed user silently returns the user
+//     with empty `identities` and does NOT send an OTP
+//   - By checking and cleaning up first, we ensure signUp() always hits
+//     the "new user" path which reliably sends the OTP email
 
 export async function POST(request: NextRequest) {
   try {
@@ -119,9 +149,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Server configuration error. Please contact support.' }, { status: 500 });
     }
 
-    // ── PRIMARY PATH: Try signUp() directly ────────────────────────────────
-    // signUp() with the anon key creates the user AND sends the OTP email.
-    // This works when the user doesn't exist yet — the common case.
+    // ── STEP 1: Check if user already exists via admin API ─────────────────
+    // Doing this BEFORE signUp() is critical because:
+    // - signUp() for an existing unconfirmed user returns the user with
+    //   empty identities[] and does NOT send an OTP
+    // - We need to detect and clean up stale users before calling signUp()
+    console.log('[SIGNUP] Checking if user exists:', normalizedEmail);
+
+    const { user: existingUser } = await findUserByEmail(adminClient, normalizedEmail);
+
+    if (existingUser) {
+      if (existingUser.email_confirmed_at) {
+        // User is confirmed — they should log in, not sign up
+        console.log('[SIGNUP] User exists and is confirmed:', normalizedEmail);
+        return NextResponse.json(
+          { error: 'An account with this email already exists. Please log in instead.' },
+          { status: 409 }
+        );
+      }
+
+      // ── UNCONFIRMED USER: Delete so signUp() can create fresh ────────────
+      // This user was created in a previous attempt but never verified.
+      // Unconfirmed users have no real data to lose.
+      console.log('[SIGNUP] Found unconfirmed user, deleting to allow fresh signup:', normalizedEmail, '(id:', existingUser.id, ')');
+
+      const { error: deleteError } = await adminClient.auth.admin.deleteUser(existingUser.id);
+      if (deleteError) {
+        console.error('[SIGNUP] Failed to delete unconfirmed user:', deleteError.message);
+        // Don't fail — try signUp() anyway, it might work
+      } else {
+        // Clean up Prisma DB record too
+        try {
+          const { db } = await import('@/lib/db');
+          await db.user.deleteMany({ where: { email: normalizedEmail } });
+        } catch {}
+
+        // Wait for Supabase to process the deletion
+        console.log('[SIGNUP] Deleted unconfirmed user, waiting for propagation...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    // ── STEP 2: Call signUp() with anon key ────────────────────────────────
+    // Now that any stale unconfirmed user is cleaned up, this should work.
     console.log('[SIGNUP] Attempting signUp for:', normalizedEmail);
 
     const { data: signUpData, error: signUpError } = await signupClient.auth.signUp({
@@ -135,216 +205,229 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // ── signUp() succeeded ──────────────────────────────────────────────────
-    if (!signUpError && signUpData?.user) {
-      // Check if auto-confirmed (shouldn't happen with "Confirm email" enabled)
-      if (signUpData.user.email_confirmed_at) {
-        console.log('[SIGNUP] User auto-confirmed (unexpected):', normalizedEmail);
-        try {
-          const { db } = await import('@/lib/db');
-          await db.user.upsert({
-            where: { email: normalizedEmail },
-            create: { id: signUpData.user.id, email: normalizedEmail, name: normalizedEmail.split('@')[0], emailVerified: new Date() },
-            update: { emailVerified: new Date() },
-          });
-        } catch {}
-        return NextResponse.json({ success: true, message: 'Account created and email confirmed.', email: normalizedEmail, emailConfirmed: true });
-      }
-
-      // Normal path: user created, OTP sent
-      console.log('[SIGNUP] Success: user created + OTP sent for:', normalizedEmail);
-      try {
-        const { db } = await import('@/lib/db');
-        await db.user.upsert({
-          where: { email: normalizedEmail },
-          create: { id: signUpData.user.id, email: normalizedEmail, name: normalizedEmail.split('@')[0], emailVerified: null },
-          update: {},
-        });
-      } catch (dbError) {
-        console.error('[SIGNUP] DB user creation failed (non-fatal):', dbError instanceof Error ? dbError.message : dbError);
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: 'Account created. A verification code has been sent to your email.',
-        email: normalizedEmail,
-        emailConfirmed: false,
-      });
-    }
-
-    // ── signUp() failed — check if it's "already registered" ────────────────
+    // ── Handle signUp() errors ─────────────────────────────────────────────
     if (signUpError) {
-      const isAlreadyRegistered =
-        signUpError.message.includes('already registered') ||
-        signUpError.message.includes('already been registered') ||
-        signUpError.message.includes('User already registered');
+      console.error('[SIGNUP] signUp error:', signUpError.message, '| status:', signUpError.status);
 
-      if (!isAlreadyRegistered) {
-        // Some other error — not "already registered"
-        console.error('[SIGNUP] signUp error (not already-registered):', signUpError.message);
-        return NextResponse.json({ error: 'Unable to create account. Please try again.' }, { status: 500 });
-      }
+      // Check if it's an "already registered" error
+      if (isAlreadyRegisteredError(signUpError.message)) {
+        // We already tried to clean up in Step 1, but it might have failed
+        // or the deletion hasn't propagated yet.
+        // Try one more time: find + delete + retry signUp
+        console.log('[SIGNUP] "Already registered" after cleanup attempt, retrying...');
 
-      // ── "ALREADY REGISTERED" PATH ─────────────────────────────────────────
-      // The user exists from a previous attempt. Check if confirmed or not.
-      console.log('[SIGNUP] User already registered, checking status:', normalizedEmail);
-
-      const { user: existingUser } = await findUserByEmail(adminClient, normalizedEmail);
-
-      if (existingUser && existingUser.email_confirmed_at) {
-        // User is confirmed — they should log in, not sign up
-        console.log('[SIGNUP] User exists and is confirmed:', normalizedEmail);
-        return NextResponse.json(
-          { error: 'An account with this email already exists. Please log in instead.' },
-          { status: 409 }
-        );
-      }
-
-      // ── UNCONFIRMED USER: Delete + Recreate ───────────────────────────────
-      // This user was created in a previous attempt but never verified.
-      // Their account is broken — no data to lose.
-      // Delete it and create fresh so signUp() can send a new OTP.
-      if (existingUser) {
-        console.log('[SIGNUP] Deleting unconfirmed user to recreate:', normalizedEmail, '(id:', existingUser.id, ')');
-
-        const { error: deleteError } = await adminClient.auth.admin.deleteUser(existingUser.id);
-        if (deleteError) {
-          console.error('[SIGNUP] Failed to delete unconfirmed user:', deleteError.message);
-          return NextResponse.json(
-            { error: 'Could not reset your previous signup attempt. Please try again.' },
-            { status: 500 }
-          );
-        }
-
-        // Clean up Prisma DB record too
-        try {
-          const { db } = await import('@/lib/db');
-          await db.user.deleteMany({ where: { email: normalizedEmail } });
-        } catch {}
-
-        console.log('[SIGNUP] Deleted unconfirmed user, now creating fresh:', normalizedEmail);
-      } else {
-        // User not found by admin API but signUp says "already registered"
-        // This can happen due to listUsers pagination or timing.
-        // Try to find the user with a different approach.
-        console.log('[SIGNUP] User not found in admin listUsers but signUp says already registered.');
-        console.log('[SIGNUP] This may be a Supabase race condition. Retrying signUp...');
-      }
-
-      // ── RETRY signUp() after cleanup ──────────────────────────────────────
-      // Wait a moment for Supabase to fully process the deletion
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const { data: retryData, error: retryError } = await signupClient.auth.signUp({
-        email: normalizedEmail,
-        password,
-        options: {
-          data: {
-            agreed_to_policy: true,
-            agreed_at: new Date().toISOString(),
-          },
-        },
-      });
-
-      if (retryError) {
-        console.error('[SIGNUP] Retry signUp error:', retryError.message);
-
-        // If STILL "already registered", the delete might not have propagated yet
-        if (retryError.message.includes('already registered') || retryError.message.includes('already been registered')) {
-          console.log('[SIGNUP] Still "already registered" after delete. Trying admin createUser + admin update...');
-          // Last resort: create with admin (auto-confirms but we'll unconfirm),
-          // then try sending OTP
-          try {
-            const { data: createData, error: createError } = await adminClient.auth.admin.createUser({
-              email: normalizedEmail,
-              password,
-              email_confirm: false,
-              user_metadata: {
-                agreed_to_policy: true,
-                agreed_at: new Date().toISOString(),
-              },
-            });
-
-            if (createError && !createError.message.includes('already registered')) {
-              console.error('[SIGNUP] Admin create error:', createError.message);
-              return NextResponse.json({ error: 'Unable to create account. Please try again later.' }, { status: 500 });
-            }
-
-            // If user already exists even via admin, try to send OTP via signInWithOtp
-            const { error: otpError } = await signupClient.auth.signInWithOtp({
-              email: normalizedEmail,
-              options: { shouldCreateUser: false },
-            });
-
-            if (otpError) {
-              console.error('[SIGNUP] signInWithOtp after admin create error:', otpError.message);
-              return NextResponse.json(
-                { error: 'Account exists but we could not send a verification code. Please try again in a few minutes.' },
-                { status: 500 }
-              );
-            }
-
-            // OTP was sent
-            const userId = createData?.user?.id || existingUser?.id;
-            if (userId) {
-              try {
-                const { db } = await import('@/lib/db');
-                await db.user.upsert({
-                  where: { email: normalizedEmail },
-                  create: { id: userId, email: normalizedEmail, name: normalizedEmail.split('@')[0], emailVerified: null },
-                  update: {},
-                });
-              } catch {}
-            }
-
-            console.log('[SIGNUP] OTP sent via fallback for:', normalizedEmail);
-            return NextResponse.json({
-              success: true,
-              message: 'A verification code has been sent to your email.',
-              email: normalizedEmail,
-              emailConfirmed: false,
-            });
-          } catch (adminErr) {
-            console.error('[SIGNUP] Admin fallback error:', adminErr);
-            return NextResponse.json({ error: 'Unable to create account. Please try again later.' }, { status: 500 });
+        const { user: retryUser } = await findUserByEmail(adminClient, normalizedEmail);
+        if (retryUser && !retryUser.email_confirmed_at) {
+          const { error: del2 } = await adminClient.auth.admin.deleteUser(retryUser.id);
+          if (!del2) {
+            try {
+              const { db } = await import('@/lib/db');
+              await db.user.deleteMany({ where: { email: normalizedEmail } });
+            } catch {}
+            await new Promise(resolve => setTimeout(resolve, 1500));
           }
         }
 
-        return NextResponse.json({ error: 'Unable to create account. Please try again.' }, { status: 500 });
-      }
-
-      if (!retryData?.user) {
-        console.error('[SIGNUP] Retry signUp returned no user');
-        return NextResponse.json({ error: 'Unable to create account. Please try again.' }, { status: 500 });
-      }
-
-      // Retry succeeded!
-      console.log('[SIGNUP] Retry signUp succeeded for:', normalizedEmail);
-
-      try {
-        const { db } = await import('@/lib/db');
-        await db.user.upsert({
-          where: { email: normalizedEmail },
-          create: { id: retryData.user.id, email: normalizedEmail, name: normalizedEmail.split('@')[0], emailVerified: null },
-          update: {},
+        // Retry signUp after second cleanup
+        const { data: retryData, error: retryError } = await signupClient.auth.signUp({
+          email: normalizedEmail,
+          password,
+          options: {
+            data: {
+              agreed_to_policy: true,
+              agreed_at: new Date().toISOString(),
+            },
+          },
         });
-      } catch {}
 
-      return NextResponse.json({
-        success: true,
-        message: 'A verification code has been sent to your email.',
-        email: normalizedEmail,
-        emailConfirmed: false,
-      });
+        if (retryError) {
+          console.error('[SIGNUP] Retry signUp also failed:', retryError.message);
+
+          // Last resort: use admin to create + send OTP via signInWithOtp
+          console.log('[SIGNUP] Trying admin fallback: update existing user + send OTP');
+          return await adminFallbackSignup(adminClient, signupClient, normalizedEmail, password, retryUser);
+        }
+
+        // Retry succeeded
+        return handleSuccessfulSignup(retryData, normalizedEmail);
+      }
+
+      // Rate limit error
+      if (signUpError.message.toLowerCase().includes('rate limit') || signUpError.message.toLowerCase().includes('too many')) {
+        return NextResponse.json(
+          { error: 'Too many requests. Please wait a minute and try again.' },
+          { status: 429 }
+        );
+      }
+
+      // Other error — return the actual message so we can debug
+      console.error('[SIGNUP] Unrecognized signUp error:', signUpError.message);
+      return NextResponse.json(
+        { error: `Could not create your account: ${signUpError.message}` },
+        { status: 500 }
+      );
     }
 
-    // ── signUp returned no error but also no user (shouldn't happen) ────────
-    console.error('[SIGNUP] signUp returned no error and no user');
-    return NextResponse.json({ error: 'Unable to create account. Please try again.' }, { status: 500 });
+    // ── signUp() returned without error ────────────────────────────────────
+    return handleSuccessfulSignup(signUpData, normalizedEmail);
 
   } catch (error) {
     console.error('[SIGNUP] Unexpected error:', error instanceof Error ? error.message : error);
     console.error('[SIGNUP] Stack:', error instanceof Error ? error.stack : 'N/A');
     return NextResponse.json({ error: 'An unexpected error occurred. Please try again.' }, { status: 500 });
+  }
+}
+
+// ─── Handle a successful signUp() response ──────────────────────────────────
+// Supabase signUp() can return different things:
+// 1. { user: { id, ... }, session: null } — new unconfirmed user, OTP sent
+// 2. { user: { id, ... }, session: { ... } } — auto-confirmed (shouldn't happen with "Confirm email" on)
+// 3. { user: { id, identities: [] }, session: null } — user ALREADY EXISTS, OTP NOT sent
+//    This is the tricky case: Supabase returns the user but with empty identities
+//    to avoid revealing whether the email is registered. No OTP is sent.
+function handleSuccessfulSignup(
+  signUpData: { user?: { id?: string; email_confirmed_at?: string; identities?: unknown[] } | null; session?: unknown },
+  email: string
+) {
+  if (!signUpData?.user) {
+    // This shouldn't happen but handle it
+    console.error('[SIGNUP] signUp returned no error but no user object');
+    return NextResponse.json({ error: 'Account creation returned an unexpected result. Please try again.' }, { status: 500 });
+  }
+
+  // Check for the "empty identities" case — user already existed
+  // Supabase returns { user: { id, identities: [] }, session: null } when the
+  // user already exists but is unconfirmed. No OTP was sent.
+  const identities = signUpData.user.identities;
+  if (Array.isArray(identities) && identities.length === 0) {
+    console.log('[SIGNUP] signUp returned user with empty identities — user already exists, OTP NOT sent');
+    // We need to handle this: the user exists but no OTP was sent
+    // Return a specific error so the frontend knows to try a different approach
+    return NextResponse.json({
+      error: 'An account with this email already exists but is not verified. We will send you a new verification code.',
+      requiresOtpResend: true,
+      email,
+    }, { status: 409 });
+  }
+
+  // Check if auto-confirmed (shouldn't happen with "Confirm email" enabled)
+  if (signUpData.user.email_confirmed_at) {
+    console.log('[SIGNUP] User auto-confirmed (unexpected):', email);
+    if (signUpData.user.id) {
+      ensureDbUser(signUpData.user.id, email, new Date());
+    }
+    return NextResponse.json({
+      success: true,
+      message: 'Account created and email confirmed.',
+      email,
+      emailConfirmed: true,
+    });
+  }
+
+  // Normal success: new user created, OTP sent
+  console.log('[SIGNUP] Success: user created + OTP sent for:', email);
+  if (signUpData.user.id) {
+    ensureDbUser(signUpData.user.id, email, null);
+  }
+
+  return NextResponse.json({
+    success: true,
+    message: 'Account created. A verification code has been sent to your email.',
+    email,
+    emailConfirmed: false,
+  });
+}
+
+// ─── Admin fallback: when signUp() keeps failing ───────────────────────────
+// This handles the edge case where the user exists in Supabase but we can't
+// delete them (e.g., they're stuck in some weird state).
+// Strategy: Update the user's password with admin API, then send OTP.
+async function adminFallbackSignup(
+  adminClient: ReturnType<typeof createServerSupabaseClient>,
+  signupClient: ReturnType<typeof createSignupClient>,
+  email: string,
+  password: string,
+  existingUser: { id?: string } | null
+) {
+  try {
+    let userId = existingUser?.id;
+
+    // If no existing user found, try to find them again
+    if (!userId) {
+      const { user } = await findUserByEmail(adminClient, email);
+      userId = user?.id;
+    }
+
+    if (!userId) {
+      // User truly doesn't exist — create with admin
+      console.log('[SIGNUP] Admin fallback: creating user:', email);
+      const { data: createData, error: createError } = await adminClient.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: false,
+        user_metadata: {
+          agreed_to_policy: true,
+          agreed_at: new Date().toISOString(),
+        },
+      });
+
+      if (createError) {
+        console.error('[SIGNUP] Admin create error:', createError.message);
+        return NextResponse.json(
+          { error: 'Could not create your account. Please try again later.' },
+          { status: 500 }
+        );
+      }
+
+      userId = createData.user?.id;
+    } else {
+      // User exists — update their password
+      console.log('[SIGNUP] Admin fallback: updating password for existing user:', email);
+      const { error: updateError } = await adminClient.auth.admin.updateUserById(userId, {
+        password,
+        user_metadata: {
+          agreed_to_policy: true,
+          agreed_at: new Date().toISOString(),
+        },
+      });
+      if (updateError) {
+        console.error('[SIGNUP] Admin update error:', updateError.message);
+        // Continue anyway — we just need to send OTP
+      }
+    }
+
+    // Now send OTP via signInWithOtp
+    console.log('[SIGNUP] Admin fallback: sending OTP via signInWithOtp for:', email);
+    const { error: otpError } = await signupClient.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false },
+    });
+
+    if (otpError) {
+      console.error('[SIGNUP] Admin fallback signInWithOtp error:', otpError.message);
+      return NextResponse.json(
+        { error: 'Your account exists but we could not send a verification code. Please try again in a few minutes.' },
+        { status: 500 }
+      );
+    }
+
+    // OTP was sent!
+    if (userId) {
+      ensureDbUser(userId, email, null);
+    }
+
+    console.log('[SIGNUP] Admin fallback: OTP sent for:', email);
+    return NextResponse.json({
+      success: true,
+      message: 'A verification code has been sent to your email.',
+      email,
+      emailConfirmed: false,
+    });
+  } catch (err) {
+    console.error('[SIGNUP] Admin fallback unexpected error:', err);
+    return NextResponse.json(
+      { error: 'Could not create your account. Please try again later.' },
+      { status: 500 }
+    );
   }
 }

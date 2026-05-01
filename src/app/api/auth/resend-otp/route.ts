@@ -61,9 +61,25 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
-      console.error('[RESEND-OTP] Supabase error:', error.message);
+      console.error('[RESEND-OTP] Supabase error:', error.message, '| status:', error.status);
 
-      if (error.message.includes('not found') || error.message.includes('No user')) {
+      // If signInWithOtp fails, try without shouldCreateUser flag
+      // This can happen when the user was created via admin API
+      if (error.message.includes('not found') || error.message.includes('No user') || error.message.includes('Signups not allowed')) {
+        console.log('[RESEND-OTP] Retrying without shouldCreateUser: false');
+        const { error: retryError } = await signupClient.auth.signInWithOtp({
+          email: emailKey,
+        });
+
+        if (!retryError) {
+          lastResendTime.set(emailKey, now);
+          return NextResponse.json({
+            success: true,
+            message: 'A new verification code has been sent to your email.',
+          });
+        }
+
+        console.error('[RESEND-OTP] Retry also failed:', retryError.message);
         return NextResponse.json(
           { error: 'No account found with this email. Please sign up first.' },
           { status: 404 }

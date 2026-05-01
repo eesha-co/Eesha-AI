@@ -189,6 +189,22 @@ export default function SignupPage() {
       const data = await res.json();
 
       if (!res.ok) {
+        // Special case: user already exists but is unverified — auto-resend OTP
+        if (data.requiresOtpResend) {
+          console.log('[SIGNUP] Auto-resending OTP for existing unverified user');
+          const otpRes = await fetch('/api/auth/resend-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          if (otpRes.ok) {
+            // OTP resent successfully — go to verify step
+            setStep('verify');
+            setResendCooldown(60);
+            return;
+          }
+          // If resend fails, still show the error
+        }
         setError(data.error || 'Sign-up failed. Please try again.');
         return;
       }

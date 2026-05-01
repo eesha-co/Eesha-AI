@@ -59,25 +59,42 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
   return (
     <div className="shrink-0 px-4 pb-4 pt-2 relative" style={{ zIndex: 2 }}>
       <div className="mx-auto max-w-[768px]">
-        {/* Input container — glass morphism */}
+        {/* Input container — glass morphism with aurora glow */}
         <motion.div
           animate={{
             boxShadow: isFocused
-              ? '0 0 30px rgba(139, 92, 246, 0.15), 0 0 60px rgba(34, 211, 238, 0.08)'
-              : '0 0 0px rgba(139, 92, 246, 0), 0 0 0px rgba(34, 211, 238, 0)',
+              ? isStreaming
+                ? '0 0 30px rgba(139, 92, 246, 0.2), 0 0 60px rgba(52, 211, 153, 0.1), 0 0 80px rgba(96, 165, 250, 0.06)'
+                : '0 0 30px rgba(139, 92, 246, 0.15), 0 0 60px rgba(52, 211, 153, 0.08)'
+              : '0 0 0px rgba(139, 92, 246, 0), 0 0 0px rgba(52, 211, 153, 0)',
           }}
           transition={{ duration: 0.4, ease: 'easeOut' }}
-          className="input-glow relative rounded-2xl border border-white/12 dark:border-white/10 bg-white/20 dark:bg-white/5 backdrop-blur-xl transition-all duration-300 focus-within:border-primary/30 focus-within:bg-white/30 dark:focus-within:bg-white/8"
+          className={`input-glow relative rounded-2xl border transition-all duration-300 ${
+            isStreaming
+              ? 'border-primary/20 dark:border-primary/20 bg-white/20 dark:bg-white/5'
+              : 'border-white/12 dark:border-white/10 bg-white/20 dark:bg-white/5'
+          } backdrop-blur-xl focus-within:border-primary/30 focus-within:bg-white/30 dark:focus-within:bg-white/8`}
         >
+          {/* Aurora borealis effect when streaming */}
+          {isStreaming && (
+            <div className="absolute inset-0 rounded-2xl animate-aurora opacity-30 pointer-events-none" />
+          )}
+
           <div className="flex items-end gap-2 p-3">
-            {/* Model indicator with glow */}
+            {/* Model indicator — subtle pulse when thinking */}
             <div className="mb-0.5 flex items-center gap-1.5 shrink-0">
               <motion.div
-                animate={{ rotate: isStreaming ? 360 : 0 }}
-                transition={{ duration: 2, repeat: isStreaming ? Infinity : 0, ease: 'linear' }}
-                className="relative flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600/30 to-cyan-600/30 border border-white/10 overflow-hidden"
+                animate={{
+                  scale: isStreaming ? [1, 1.08, 1] : 1,
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: isStreaming ? Infinity : 0,
+                  ease: 'easeInOut',
+                }}
+                className="relative flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600/30 to-emerald-600/30 border border-white/10 overflow-hidden"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/15 to-cyan-500/15" />
+                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/15 to-emerald-500/15" />
                 <Code2 className="relative size-3.5 text-primary" />
               </motion.div>
             </div>
@@ -135,7 +152,7 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
                   <Button
                     onClick={handleSubmit}
                     disabled={!input.trim()}
-                    className="size-8 shrink-0 rounded-xl bg-gradient-to-r from-violet-600 to-cyan-600 text-white shadow-lg shadow-violet-500/30 transition-all hover:shadow-violet-500/50 disabled:opacity-20 disabled:shadow-none"
+                    className="size-8 shrink-0 rounded-xl bg-gradient-to-r from-violet-600 to-emerald-600 text-white shadow-lg shadow-violet-500/30 transition-all hover:shadow-violet-500/50 disabled:opacity-20 disabled:shadow-none"
                     size="icon"
                     title="Send message"
                   >

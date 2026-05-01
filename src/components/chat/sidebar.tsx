@@ -139,7 +139,7 @@ export function Sidebar() {
           {/* Header with branding */}
           <div className="flex items-center justify-between px-4 py-4">
             <div className="flex items-center gap-2.5">
-              <img src="/logo-transparent.png" alt="Eesha AI" className="h-10 w-auto object-contain" />
+              <img src="/splash-screen.png" alt="Eesha AI" className="h-10 w-auto object-contain" />
               <span className="flex items-center gap-1 text-[10px] text-[var(--text-tertiary)]">
                 <Zap className="size-2.5 text-amber-500" />
                 Advanced AI Model

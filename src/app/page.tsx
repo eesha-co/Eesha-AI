@@ -89,7 +89,7 @@ export default function Home() {
       {/* Main content area — TRANSPARENT background so canvas shows through */}
       <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden" style={{ zIndex: 1 }}>
         {/* Header bar — glass morphism, semi-transparent */}
-        <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/5 dark:border-white/5 bg-background/60 dark:bg-black/40 px-4 backdrop-blur-xl">
+        <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/5 dark:border-white/5 bg-[#f8f8ff]/40 dark:bg-[#0a0a14]/50 px-4 backdrop-blur-xl">
           <Header />
           <div className="flex items-center gap-1">
             {/* </> toggle — cycles: closed → workspace → terminal → closed */}

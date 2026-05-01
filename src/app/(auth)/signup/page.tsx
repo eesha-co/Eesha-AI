@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { signIn, getProviders } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -105,7 +104,6 @@ function getStepLabel(step: Step): string {
 
 // ─── Signup Page ──────────────────────────────────────────────────────────────
 export default function SignupPage() {
-  const router = useRouter();
   const [providers, setProviders] = useState<Record<string, ProviderInfo>>({});
 
   // Multi-step state
@@ -349,7 +347,7 @@ export default function SignupPage() {
       <div className="hidden lg:flex relative z-10 w-1/2 flex-col justify-between p-12 border-r border-white/5">
         {/* Back link */}
         <button
-          onClick={() => router.push('/')}
+          onClick={() => window.location.href = '/'}
           className="flex items-center gap-2 text-sm text-zinc-500 transition-colors hover:text-zinc-300 self-start"
         >
           ← Back to chat
@@ -400,7 +398,7 @@ export default function SignupPage() {
         <div className="w-full max-w-lg">
           {/* Mobile back link */}
           <button
-            onClick={() => router.push('/')}
+            onClick={() => window.location.href = '/'}
             className="lg:hidden flex items-center gap-2 text-sm text-zinc-500 transition-colors hover:text-zinc-300 mb-6"
           >
             ← Back to chat
@@ -802,7 +800,7 @@ export default function SignupPage() {
                   Your email has been verified. You can now sign in with your credentials.
                 </p>
                 <button
-                  onClick={() => router.push('/login')}
+                  onClick={() => window.location.href = '/login'}
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-cyan-600 px-4 py-3.5 text-sm font-semibold text-white transition-all hover:from-violet-500 hover:to-cyan-500"
                 >
                   Sign In Now
@@ -817,7 +815,7 @@ export default function SignupPage() {
             <div className="mt-8 text-center text-sm text-zinc-400">
               Already have an account?{' '}
               <button
-                onClick={() => router.push('/login')}
+                onClick={() => window.location.href = '/login'}
                 className="text-violet-400 hover:text-violet-300 transition-colors font-medium"
               >
                 Log in

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { signIn, getProviders } from 'next-auth/react';
 import { motion } from 'framer-motion';
 import {
@@ -16,7 +15,6 @@ interface ProviderInfo {
 }
 
 export default function LoginPage() {
-  const router = useRouter();
   const [providers, setProviders] = useState<Record<string, ProviderInfo>>({});
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -81,7 +79,7 @@ export default function LoginPage() {
           setError('Invalid email or password. Please try again.');
         }
       } else if (result?.ok) {
-        router.push('/');
+        window.location.href = '/';
       }
     } catch {
       setError('Login failed. Please try again.');
@@ -99,7 +97,7 @@ export default function LoginPage() {
       <div className="hidden lg:flex relative z-10 w-1/2 flex-col justify-between p-12 border-r border-white/5">
         {/* Back link */}
         <button
-          onClick={() => router.push('/')}
+          onClick={() => window.location.href = '/'}
           className="flex items-center gap-2 text-sm text-zinc-500 transition-colors hover:text-zinc-300 self-start"
         >
           ← Back to chat
@@ -151,7 +149,7 @@ export default function LoginPage() {
         <div className="w-full max-w-lg">
           {/* Mobile back link */}
           <button
-            onClick={() => router.push('/')}
+            onClick={() => window.location.href = '/'}
             className="lg:hidden flex items-center gap-2 text-sm text-zinc-500 transition-colors hover:text-zinc-300 mb-6"
           >
             ← Back to chat
@@ -260,7 +258,7 @@ export default function LoginPage() {
           <div className="mt-8 text-center text-sm text-zinc-400">
             Don&apos;t have an account?{' '}
             <button
-              onClick={() => router.push('/signup')}
+              onClick={() => window.location.href = '/signup'}
               className="text-violet-400 hover:text-violet-300 transition-colors font-medium"
             >
               Sign up

@@ -130,7 +130,7 @@ export function TerminalPanel() {
   return (
     <div className="flex h-full flex-col bg-white/30 dark:bg-black/40 backdrop-blur-sm" onClick={focusInput}>
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
+      <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-3 py-1.5">
         <div className="flex items-center gap-1.5">
           <TerminalIcon className="size-3 text-emerald-500" />
           <span className="text-[11px] font-medium text-muted-foreground">Terminal</span>
@@ -161,7 +161,7 @@ export function TerminalPanel() {
         {/* Persistent background logo watermark — always visible, content types over it */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <img
-            src="/transparent-logo.png"
+            src="/splash-screen.png"
             alt=""
             className="object-contain animate-breathe-slow select-none"
             style={{
@@ -199,7 +199,7 @@ export function TerminalPanel() {
       </div>
 
       {/* Input area */}
-      <div className="flex items-center gap-2 border-t border-border px-3 py-2 bg-white/30 dark:bg-black/30">
+      <div className="flex items-center gap-2 border-t border-[var(--border-subtle)] px-3 py-2 bg-white/30 dark:bg-black/30">
         <span className="text-xs text-emerald-600 dark:text-emerald-400 shrink-0">$</span>
         <input
           ref={inputRef}

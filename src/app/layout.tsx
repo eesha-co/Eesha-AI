@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   keywords: ["Eesha AI", "AI", "coding assistant", "code generation", "coding agent"],
   authors: [{ name: "Eesha AI" }],
   icons: {
-    icon: ["/favicon-64.png", "/logo-256.png"],
+    icon: ["/splash-screen.png"],
   },
 };
 
@@ -82,12 +82,11 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
-                  // Check localStorage for saved theme preference
-                  var saved = localStorage.getItem('eesha-theme');
+                  // Use system preference only — no localStorage
                   var dark = window.matchMedia('(prefers-color-scheme: dark)');
 
-                  function applyTheme(theme) {
-                    if (theme === 'dark' || (theme === 'system' && dark.matches) || (!theme && dark.matches)) {
+                  function applySystemTheme() {
+                    if (dark.matches) {
                       document.documentElement.classList.add('dark');
                     } else {
                       document.documentElement.classList.remove('dark');
@@ -95,20 +94,11 @@ export default function RootLayout({
                   }
 
                   // Apply theme immediately to prevent flash
-                  if (saved) {
-                    var parsed = JSON.parse(saved);
-                    applyTheme(parsed.mode || 'system');
-                  } else {
-                    applyTheme('system');
-                  }
+                  applySystemTheme();
 
-                  // Listen for system theme changes
-                  dark.addEventListener('change', function(e) {
-                    var current = localStorage.getItem('eesha-theme');
-                    var mode = current ? JSON.parse(current).mode : 'system';
-                    if (mode === 'system') {
-                      applyTheme('system');
-                    }
+                  // React to system theme changes in real-time
+                  dark.addEventListener('change', function() {
+                    applySystemTheme();
                   });
                 } catch(e) {}
               })();
@@ -121,7 +111,7 @@ export default function RootLayout({
       >
         {/* Splash screen — pure HTML/CSS, removed by JS after mount */}
         <div id="eesha-splash">
-          <img src="/logo-transparent.png" alt="Eesha AI" />
+          <img src="/splash-screen.png" alt="Eesha AI" />
           <div className="splash-sub">LOADING</div>
         </div>
         <script dangerouslySetInnerHTML={{ __html: `

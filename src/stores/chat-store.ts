@@ -58,14 +58,7 @@ interface ChatState {
 }
 
 function getInitialTheme(): ThemeMode {
-  if (typeof window === 'undefined') return 'system';
-  try {
-    const saved = localStorage.getItem('eesha-theme');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return parsed.mode || 'system';
-    }
-  } catch {}
+  // Always use system preference — no localStorage
   return 'system';
 }
 
@@ -78,9 +71,7 @@ function applyTheme(mode: ThemeMode) {
   } else {
     document.documentElement.classList.remove('dark');
   }
-  try {
-    localStorage.setItem('eesha-theme', JSON.stringify({ mode }));
-  } catch {}
+  // No localStorage — theme follows system preference in production
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({

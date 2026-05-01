@@ -61,7 +61,7 @@ export function CodeEditor() {
         {/* Logo watermark — always visible, content overlays it */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <img
-            src="/splash-screen.png"
+            src="/transparent-logo.png"
             alt=""
             className="object-contain animate-breathe-slow select-none"
             style={{
@@ -142,7 +142,7 @@ export function CodeEditor() {
           {/* Background logo watermark — always visible behind code */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <img
-              src="/splash-screen.png"
+              src="/transparent-logo.png"
               alt=""
               className="object-contain animate-breathe-slow select-none"
               style={{

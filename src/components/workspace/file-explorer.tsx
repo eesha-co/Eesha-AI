@@ -140,7 +140,7 @@ export function FileExplorer() {
           {files.length === 0 && (
             <div className="relative flex flex-col items-center justify-center py-10 text-[11px] text-muted-foreground">
               <img
-                src="/splash-screen.png"
+                src="/transparent-logo.png"
                 alt=""
                 className="size-16 object-contain opacity-20 mb-3 animate-breathe-slow"
                 style={{ filter: 'brightness(1.8) saturate(1.4) drop-shadow(0 0 30px rgba(139, 92, 246, 0.15))' }}

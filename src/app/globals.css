@@ -46,7 +46,7 @@
 /* ─── Light Mode ──────────────────────────────────────────── */
 :root {
   --radius: 0.625rem;
-  --background: #f5f5fa;
+  --background: #f0f0f5;
   --foreground: #1a1a2e;
   --card: #ffffff;
   --card-foreground: #1a1a2e;
@@ -95,50 +95,54 @@
   --scrollbar-thumb-hover: rgba(0, 0, 0, 0.2);
   --selection-bg: rgba(124, 58, 237, 0.12);
   --selection-text: #1a1a2e;
+  --mint-glass: #34D399;
+  --aurora-1: rgba(139, 92, 246, 0.3);
+  --aurora-2: rgba(52, 211, 153, 0.3);
+  --aurora-3: rgba(96, 165, 250, 0.3);
 }
 
 /* ─── Dark Mode ───────────────────────────────────────────── */
 .dark {
-  --background: #09090f;
-  --foreground: #f4f4f5;
-  --card: #0c0c14;
-  --card-foreground: #f4f4f5;
-  --popover: #0c0c14;
-  --popover-foreground: #f4f4f5;
-  --primary: #a78bfa;
-  --primary-foreground: #09090f;
-  --secondary: #16162b;
-  --secondary-foreground: #f4f4f5;
-  --muted: #16162b;
+  --background: #0a0a12;
+  --foreground: #e8e8ed;
+  --card: #111118;
+  --card-foreground: #e8e8ed;
+  --popover: #111118;
+  --popover-foreground: #e8e8ed;
+  --primary: #8B5CF6;
+  --primary-foreground: #0a0a12;
+  --secondary: #161622;
+  --secondary-foreground: #e8e8ed;
+  --muted: #161622;
   --muted-foreground: #a1a1aa;
-  --accent: #16162b;
-  --accent-foreground: #f4f4f5;
+  --accent: #161622;
+  --accent-foreground: #e8e8ed;
   --destructive: #ef4444;
   --border: rgba(255, 255, 255, 0.06);
   --input: rgba(255, 255, 255, 0.06);
-  --ring: #a78bfa;
-  --chart-1: #a78bfa;
+  --ring: #8B5CF6;
+  --chart-1: #8B5CF6;
   --chart-2: #22d3ee;
   --chart-3: #f472b6;
   --chart-4: #34d399;
   --chart-5: #fbbf24;
-  --sidebar: #0c0c14;
-  --sidebar-foreground: #f4f4f5;
-  --sidebar-primary: #a78bfa;
-  --sidebar-primary-foreground: #09090f;
+  --sidebar: #111118;
+  --sidebar-foreground: #e8e8ed;
+  --sidebar-primary: #8B5CF6;
+  --sidebar-primary-foreground: #0a0a12;
   --sidebar-accent: rgba(255, 255, 255, 0.04);
-  --sidebar-accent-foreground: #f4f4f5;
+  --sidebar-accent-foreground: #e8e8ed;
   --sidebar-border: rgba(255, 255, 255, 0.06);
-  --sidebar-ring: #a78bfa;
+  --sidebar-ring: #8B5CF6;
 
-  /* Custom semantic tokens */
-  --surface-primary: #0c0c14;
-  --surface-secondary: #111122;
-  --surface-tertiary: #16162b;
-  --text-primary: #f4f4f5;
+  /* Custom semantic tokens — Cyber-Linen palette */
+  --surface-primary: #111118;
+  --surface-secondary: #161622;
+  --surface-tertiary: #1c1c2e;
+  --text-primary: #e8e8ed;
   --text-secondary: #a1a1aa;
   --text-tertiary: #71717a;
-  --text-inverse: #09090f;
+  --text-inverse: #0a0a12;
   --border-subtle: rgba(255, 255, 255, 0.04);
   --border-medium: rgba(255, 255, 255, 0.08);
   --glow-color: rgba(139, 92, 246, 0.15);
@@ -147,7 +151,11 @@
   --scrollbar-thumb: rgba(255, 255, 255, 0.06);
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.12);
   --selection-bg: rgba(139, 92, 246, 0.3);
-  --selection-text: #f4f4f5;
+  --selection-text: #e8e8ed;
+  --mint-glass: #34D399;
+  --aurora-1: rgba(139, 92, 246, 0.3);
+  --aurora-2: rgba(52, 211, 153, 0.3);
+  --aurora-3: rgba(96, 165, 250, 0.3);
 }
 
 @layer base {
@@ -429,7 +437,7 @@
   position: absolute;
   inset: -1px;
   border-radius: inherit;
-  background: linear-gradient(135deg, var(--primary), #22d3ee, var(--primary));
+  background: linear-gradient(135deg, var(--primary), var(--mint-glass), #60a5fa);
   background-size: 200% 200%;
   animation: gradient-border 3s ease infinite;
   opacity: 0;
@@ -439,21 +447,6 @@
 
 .input-glow:focus-within::before {
   opacity: 1;
-}
-
-/* ===== Sidebar item active ===== */
-.sidebar-item-active {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(34, 211, 238, 0.08));
-  border-color: rgba(139, 92, 246, 0.2);
-}
-
-/* Light mode sidebar active */
-:root .sidebar-item-active {
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(6, 182, 212, 0.05));
-}
-
-.dark .sidebar-item-active {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(34, 211, 238, 0.08));
 }
 
 /* ===== Suggestion card — glass morphism ===== */
@@ -469,7 +462,7 @@
   inset: 0;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(34, 211, 238, 0.4), rgba(139, 92, 246, 0.2));
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(52, 211, 153, 0.4), rgba(96, 165, 250, 0.2));
   background-size: 200% 200%;
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
@@ -525,7 +518,50 @@
 
 /* ===== Input glow — stronger for dark mode ===== */
 .input-glow::before {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.6), rgba(34, 211, 238, 0.6), rgba(139, 92, 246, 0.3));
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.6), rgba(52, 211, 153, 0.6), rgba(96, 165, 250, 0.4));
   background-size: 200% 200%;
   animation: gradient-border 3s ease infinite;
+}
+
+/* ===== Aurora borealis gradient shift ===== */
+@keyframes aurora-shift {
+  0% { background-position: 0% 50%; }
+  25% { background-position: 50% 0%; }
+  50% { background-position: 100% 50%; }
+  75% { background-position: 50% 100%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-aurora {
+  background: linear-gradient(135deg, var(--aurora-1), var(--aurora-2), var(--aurora-3), var(--aurora-1));
+  background-size: 300% 300%;
+  animation: aurora-shift 8s ease-in-out infinite;
+}
+
+/* ===== Cyber text glow — WCAG 2.1 AA compliant ===== */
+@keyframes cyber-text-glow {
+  0%, 100% {
+    text-shadow: 0 0 20px var(--glow-color), 0 0 40px rgba(52, 211, 153, 0.08);
+  }
+  50% {
+    text-shadow: 0 0 30px var(--glow-color), 0 0 60px rgba(52, 211, 153, 0.15);
+  }
+}
+
+.animate-cyber-text-glow {
+  animation: cyber-text-glow 4s ease-in-out infinite;
+}
+
+/* ===== Sidebar item active — updated with mint glass ===== */
+.sidebar-item-active {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(52, 211, 153, 0.08));
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+:root .sidebar-item-active {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(52, 211, 153, 0.05));
+}
+
+.dark .sidebar-item-active {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(52, 211, 153, 0.08));
 }

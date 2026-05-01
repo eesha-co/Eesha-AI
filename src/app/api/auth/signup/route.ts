@@ -91,8 +91,13 @@ async function ensureDbUser(userId: string, email: string, emailVerified: Date |
 }
 
 // ─── Helper: Verify password was saved and fix if not ────────────────────────
-// After signUp(), we verify the password was actually stored in auth.users.
-// If encrypted_password is empty/null, we set it via admin API.
+// After signUp(), we ensure the password was actually stored in auth.users.
+//
+// IMPORTANT: We CANNOT use signInWithPassword to verify for unconfirmed users,
+// because Supabase blocks login until the email is verified. Instead, we:
+//   1. Check if the user was created with identities (indicates proper signup)
+//   2. Always set the password via admin API as a safety measure
+//   3. Confirm the user record exists and is valid
 async function verifyAndFixPassword(
   adminClient: ReturnType<typeof createServerSupabaseClient>,
   email: string,
@@ -106,51 +111,62 @@ async function verifyAndFixPassword(
   }
 
   // Check if the user has any identities (indicates a proper signup)
-  // If identities is empty, the password might not have been saved
   const hasIdentities = Array.isArray(user.identities) && user.identities.length > 0;
+  const isConfirmed = !!user.email_confirmed_at;
 
-  // Try to verify the password works by attempting signInWithPassword
-  // with a separate anon key client
-  const signupClient = createSignupClient();
-  const { error: verifyError } = await signupClient.auth.signInWithPassword({
-    email,
-    password,
-  });
+  if (isConfirmed) {
+    // For confirmed users, we can verify the password works directly
+    const signupClient = createSignupClient();
+    const { error: verifyError } = await signupClient.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-  if (!verifyError) {
-    // Password works! Sign out immediately (we don't want a session)
-    console.log('[SIGNUP] Password verified successfully for:', email);
+    if (!verifyError) {
+      console.log('[SIGNUP] Password verified successfully for confirmed user:', email);
+      try { await signupClient.auth.signOut(); } catch {}
+      return { ok: true, userId: user.id };
+    }
+
+    // Password doesn't work for confirmed user — fix via admin API
+    console.log('[SIGNUP] Password NOT working for confirmed user, fixing via admin API...');
+    const { error: updateError } = await adminClient.auth.admin.updateUserById(user.id, { password });
+    if (updateError) {
+      console.error('[SIGNUP] Failed to set password via admin API:', updateError.message);
+      return { ok: false, userId: user.id, error: 'Password could not be saved. Please try again.' };
+    }
+
+    // Re-verify after fix
+    const { error: reverifyError } = await signupClient.auth.signInWithPassword({ email, password });
+    if (reverifyError) {
+      console.error('[SIGNUP] Password still not working after admin update:', reverifyError.message);
+      return { ok: false, userId: user.id, error: 'Password verification failed. Please try again.' };
+    }
     try { await signupClient.auth.signOut(); } catch {}
+    console.log('[SIGNUP] Password fixed and verified for confirmed user:', email);
     return { ok: true, userId: user.id };
   }
 
-  // Password doesn't work — fix it by setting it via admin API
-  console.log('[SIGNUP] Password NOT working after signUp (identities:', hasIdentities ? 'present' : 'empty', '). Fixing via admin API...');
+  // ── UNCONFIRMED USER (normal signup flow) ─────────────────────────────────
+  // Cannot use signInWithPassword — Supabase blocks login for unconfirmed emails.
+  // Instead, ensure the password is set via admin API and trust it.
+  console.log('[SIGNUP] User is unconfirmed (identities:', hasIdentities ? 'present' : 'empty', '). Ensuring password is set via admin API...');
 
   const { error: updateError } = await adminClient.auth.admin.updateUserById(user.id, {
     password,
   });
 
   if (updateError) {
-    console.error('[SIGNUP] Failed to set password via admin API:', updateError.message);
-    return { ok: false, userId: user.id, error: 'Password could not be saved. Please try again.' };
+    console.error('[SIGNUP] Failed to set password via admin API for unconfirmed user:', updateError.message);
+    // This might fail if the password was already set correctly by signUp()
+    // Only fail if it's not a "no changes" type error
+    const msg = updateError.message.toLowerCase();
+    if (!msg.includes('no changes') && !msg.includes('same password')) {
+      return { ok: false, userId: user.id, error: 'Password could not be saved. Please try again.' };
+    }
   }
 
-  // Verify the fix worked
-  const { error: reverifyError } = await signupClient.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (reverifyError) {
-    console.error('[SIGNUP] Password still not working after admin update:', reverifyError.message);
-    return { ok: false, userId: user.id, error: 'Password verification failed. Please try again.' };
-  }
-
-  // Sign out the verification session
-  try { await signupClient.auth.signOut(); } catch {}
-
-  console.log('[SIGNUP] Password fixed and verified for:', email);
+  console.log('[SIGNUP] Password ensured via admin API for unconfirmed user:', email);
   return { ok: true, userId: user.id };
 }
 

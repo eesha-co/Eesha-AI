@@ -24,7 +24,7 @@ export function SmokyBackground() {
 
     // Preload logo
     const img = new Image();
-    img.src = '/splash-screen.png';
+    img.src = '/transparent-logo.png';
     img.onload = () => { logoImg = img; };
     if (img.complete) logoImg = img;
 

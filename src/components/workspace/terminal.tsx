@@ -161,7 +161,7 @@ export function TerminalPanel() {
         {/* Persistent background logo watermark — always visible, content types over it */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <img
-            src="/splash-screen.png"
+            src="/transparent-logo.png"
             alt=""
             className="object-contain animate-breathe-slow select-none"
             style={{

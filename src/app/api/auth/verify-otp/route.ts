@@ -26,12 +26,14 @@ function checkOtpRateLimit(identifier: string): { allowed: boolean; retryAfter?:
 
 // ─── POST /api/auth/verify-otp ────────────────────────────────────────────────
 //
-// Simple Supabase OTP verification:
-//   1. Call verifyOtp({ type: 'email' }) — one type, one call
-//   2. If success → mark email verified in DB
-//   3. If error → clear message
+// Supabase OTP verification with fallback:
+//   1. Try verifyOtp({ type: 'signup' }) — for tokens from signUp()
+//   2. If that fails, try verifyOtp({ type: 'email' }) — for tokens from signInWithOtp()
+//   3. If success → mark email verified in DB + ensure password is saved
 //
-// That's it. No multiple token types, no auto-resend, no fallbacks.
+// We try 'signup' first because our signup route now uses signUp() which
+// generates signup-type tokens. We fall back to 'email' for backward
+// compatibility with any existing users who got tokens from signInWithOtp().
 
 export async function POST(request: NextRequest) {
   try {
@@ -61,23 +63,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── Verify OTP — type is always 'email' ────────────────────────────────
-    // Our signup route uses signInWithOtp() which creates tokens of type 'email'.
-    // Our resend route also uses signInWithOtp(), same type.
-    // So we always verify with type: 'email'. Simple.
-    const anonClient = createSignupClient();
+    // ── Get Supabase client ─────────────────────────────────────────────────
+    let anonClient;
+    try {
+      anonClient = createSignupClient();
+    } catch (envError) {
+      console.error('[VERIFY-OTP] Missing Supabase env vars:', envError);
+      return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });
+    }
 
-    const { data, error } = await anonClient.auth.verifyOtp({
+    // ── Try verifyOtp — attempt 'signup' first, then 'email' ──────────────
+    let data: any = null;
+    let lastError: any = null;
+
+    // Attempt 1: type 'signup' (for signUp-generated tokens)
+    console.log('[VERIFY-OTP] Attempting type=signup for:', normalizedEmail);
+    const signupResult = await anonClient.auth.verifyOtp({
       email: normalizedEmail,
       token: otp,
-      type: 'email',
+      type: 'signup',
     });
 
-    if (error) {
-      console.warn('[VERIFY-OTP] Failed:', error.message);
+    if (!signupResult.error) {
+      data = signupResult.data;
+      console.log('[VERIFY-OTP] Success with type=signup');
+    } else {
+      console.log('[VERIFY-OTP] type=signup failed:', signupResult.error.message);
+      lastError = signupResult.error;
 
-      // Map common Supabase errors to user-friendly messages
-      const msg = error.message.toLowerCase();
+      // Attempt 2: type 'email' (for signInWithOtp-generated tokens)
+      console.log('[VERIFY-OTP] Falling back to type=email for:', normalizedEmail);
+      const emailResult = await anonClient.auth.verifyOtp({
+        email: normalizedEmail,
+        token: otp,
+        type: 'email',
+      });
+
+      if (!emailResult.error) {
+        data = emailResult.data;
+        lastError = null;
+        console.log('[VERIFY-OTP] Success with type=email');
+      } else {
+        console.log('[VERIFY-OTP] type=email also failed:', emailResult.error.message);
+        lastError = emailResult.error;
+      }
+    }
+
+    // ── Handle verification failure ─────────────────────────────────────────
+    if (lastError || !data) {
+      const msg = (lastError?.message || '').toLowerCase();
 
       if (msg.includes('expired')) {
         return NextResponse.json({
@@ -97,7 +131,6 @@ export async function POST(request: NextRequest) {
         }, { status: 429 });
       }
 
-      // Generic error
       return NextResponse.json({
         error: 'Verification failed. Please try again or click "Resend" to get a new code.',
       }, { status: 400 });
@@ -108,13 +141,12 @@ export async function POST(request: NextRequest) {
       const userId = data.user.id;
 
       // ── Ensure password is set in Supabase Auth ──────────────────────────
-      // Critical fix: admin.createUser() + signInWithOtp() combo can sometimes
-      // result in the password not being persisted. We explicitly set it here.
+      // Critical: signUp() should save the password, but we double-check here.
       if (password && typeof password === 'string') {
         try {
           const adminClient = createServerSupabaseClient();
           await adminClient.auth.admin.updateUserById(userId, { password });
-          console.log('[VERIFY-OTP] Password saved to Supabase Auth for:', normalizedEmail);
+          console.log('[VERIFY-OTP] Password ensured in Supabase Auth for:', normalizedEmail);
         } catch (pwErr) {
           console.error('[VERIFY-OTP] Could not save password to Supabase Auth:', pwErr);
           // Non-fatal — the user is still verified

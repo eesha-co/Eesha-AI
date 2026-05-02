@@ -5,18 +5,18 @@ import { createSignupClient, createServerSupabaseClient } from '@/lib/supabase-s
 const resendAttempts = new Map<string, { count: number; resetTime: number }>();
 const MAX_RESEND_ATTEMPTS = 5;
 const RESEND_WINDOW_MS = 15 * 60_000;
-const RESEND_COOLDOWN_MS = 60_000; // 1 minute between resends
+const RESEND_COOLDOWN_MS = 60_000; // 1 minute between resends (Supabase enforced)
 
 const lastResendTime = new Map<string, number>();
 
 // ─── POST /api/auth/resend-otp ────────────────────────────────────────────────
 //
-// Resends an OTP code to the user's email.
-// Uses signInWithOtp() which generates tokens of type 'email'.
+// Simple Supabase OTP resend:
+//   1. Verify user exists and isn't already confirmed
+//   2. Call signInWithOtp({ shouldCreateUser: false }) — sends a new 6-digit code
+//   3. Done
 //
-// After a resend, the user should enter the NEW code from the new email.
-// The old code (from signUp(), type 'signup') is INVALIDATED because
-// signInWithOtp() overwrites the confirmation_token in auth.users.
+// The new code replaces the old one. User must use the NEW code.
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,56 +74,32 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // ── Send OTP via signInWithOtp ──────────────────────────────────────────
-    // This generates a token of type 'email' and OVERRIDES any existing
-    // 'signup' type token from signUp(). The user must use the NEW code.
-    const signupClient = createSignupClient();
-    const siteUrl = process.env.NEXTAUTH_URL || 'https://fuhaddesmond-eesha-ai.hf.space';
+    // ── Send new OTP via signInWithOtp ──────────────────────────────────────
+    // This replaces any existing code. The user must use the NEW code.
+    const anonClient = createSignupClient();
 
-    // Attempt 1: with shouldCreateUser: false (user already exists)
-    const { error: otpError1 } = await signupClient.auth.signInWithOtp({
+    const { error: otpError } = await anonClient.auth.signInWithOtp({
       email: emailKey,
       options: {
         shouldCreateUser: false,
-        emailRedirectTo: `${siteUrl}/auth/confirm`,
       },
     });
 
-    if (!otpError1) {
-      lastResendTime.set(emailKey, now);
-      console.log('[RESEND-OTP] OTP sent (shouldCreateUser: false) for:', emailKey);
-      return NextResponse.json({
-        success: true,
-        message: 'A new verification code has been sent to your email. Use the NEW code — previous codes are no longer valid.',
-        tokenType: 'email',
-      });
+    if (otpError) {
+      console.error('[RESEND-OTP] signInWithOtp failed:', otpError.message);
+      return NextResponse.json(
+        { error: 'Unable to send verification code. Please wait a minute and try again.' },
+        { status: 500 }
+      );
     }
 
-    console.warn('[RESEND-OTP] Attempt 1 failed:', otpError1.message);
+    lastResendTime.set(emailKey, now);
+    console.log('[RESEND-OTP] New OTP sent to:', emailKey);
 
-    // Attempt 2: without flag (more permissive)
-    const { error: otpError2 } = await signupClient.auth.signInWithOtp({
-      email: emailKey,
-      options: {
-        emailRedirectTo: `${siteUrl}/auth/confirm`,
-      },
+    return NextResponse.json({
+      success: true,
+      message: 'A new verification code has been sent to your email. Use the new code — the old one is no longer valid.',
     });
-
-    if (!otpError2) {
-      lastResendTime.set(emailKey, now);
-      console.log('[RESEND-OTP] OTP sent (no flag) for:', emailKey);
-      return NextResponse.json({
-        success: true,
-        message: 'A new verification code has been sent to your email. Use the NEW code — previous codes are no longer valid.',
-        tokenType: 'email',
-      });
-    }
-
-    console.error('[RESEND-OTP] All attempts failed:', otpError2.message);
-    return NextResponse.json(
-      { error: 'Unable to send verification code. Please wait a minute and try again.' },
-      { status: 500 }
-    );
 
   } catch (error) {
     console.error('[RESEND-OTP] Unexpected error:', error);

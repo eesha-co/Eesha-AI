@@ -18,7 +18,7 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GITHUB_SECRET || "",
     }),
 
-    // Email + Password credentials — verified against Supabase Auth
+    // Email + Password credentials — primary auth via Supabase Auth
     CredentialsProvider({
       id: "credentials",
       name: "Email and Password",
@@ -34,10 +34,11 @@ export const authOptions: NextAuthOptions = {
         const email = credentials.email.toLowerCase().trim();
 
         try {
-          // ── STEP 1: Try Supabase Auth signInWithPassword ─────────────────
+          // ── STEP 1: Authenticate via Supabase Auth (primary) ─────────────
+          // Supabase Auth is the single source of truth for credentials.
+          // This validates the password against bcrypt in Supabase's auth system.
           console.log('[AUTH] Attempting signInWithPassword for:', email);
 
-          let supabaseLoginWorked = false;
           let supabaseUser: any = null;
 
           try {
@@ -48,7 +49,6 @@ export const authOptions: NextAuthOptions = {
             });
 
             if (!error && data.user) {
-              supabaseLoginWorked = true;
               supabaseUser = data.user;
               console.log('[AUTH] signInWithPassword succeeded for:', email);
             } else if (error) {
@@ -58,15 +58,15 @@ export const authOptions: NextAuthOptions = {
             console.error('[AUTH] signInWithPassword threw:', e);
           }
 
-          // ── STEP 2: If Supabase login worked → check verification & return ──
-          if (supabaseLoginWorked && supabaseUser) {
+          // ── STEP 2: If Supabase login succeeded → verify email & return ──
+          if (supabaseUser) {
             // Check email verification
             if (!supabaseUser.email_confirmed_at) {
               console.log('[AUTH] User email not verified:', email);
               throw new Error("EMAIL_NOT_VERIFIED");
             }
 
-            // Find or create user in Prisma DB
+            // Find or create user in Prisma DB (for NextAuth session management)
             let user = await db.user.findUnique({ where: { email } });
 
             if (!user) {
@@ -107,25 +107,16 @@ export const authOptions: NextAuthOptions = {
             };
           }
 
-          // ── STEP 3: Supabase login failed — try bcrypt fallback ──────────
-          console.log('[AUTH] Trying local bcrypt fallback for:', email);
+          // ── STEP 3: Supabase login failed — try local bcrypt as fallback ──
+          // This handles the rare case where Supabase Auth is temporarily
+          // unavailable or there's a sync issue. We do NOT auto-reset passwords.
+          console.log('[AUTH] Supabase login failed, trying local bcrypt fallback for:', email);
           const localUser = await db.user.findUnique({ where: { email } });
 
           if (localUser?.passwordHash) {
             const passwordMatches = await bcrypt.compare(credentials.password, localUser.passwordHash);
             if (passwordMatches) {
-              console.log('[AUTH] Local bcrypt match! Fixing Supabase Auth password...');
-
-              // Fix the password in Supabase Auth so next login works
-              try {
-                const adminClient = createServerSupabaseClient();
-                await adminClient.auth.admin.updateUserById(localUser.id, {
-                  password: credentials.password,
-                });
-                console.log('[AUTH] Password synced to Supabase Auth for:', email);
-              } catch (syncErr) {
-                console.error('[AUTH] Could not sync password to Supabase:', syncErr);
-              }
+              console.log('[AUTH] Local bcrypt match for:', email);
 
               // Check email verification
               if (!localUser.emailVerified) {
@@ -146,86 +137,7 @@ export const authOptions: NextAuthOptions = {
             console.log('[AUTH] No local user or passwordHash for:', email, '| hasUser:', !!localUser, '| hasHash:', !!localUser?.passwordHash);
           }
 
-          // ── STEP 4: Last resort — admin API password reset ───────────────
-          // If the user exists in Supabase Auth but the password doesn't match,
-          // AND we don't have a bcrypt backup, check via admin API and try to
-          // fix the password. This handles users created with the old flow
-          // where the password was set via admin.createUser() but might have
-          // been lost.
-          console.log('[AUTH] Trying admin API fallback for:', email);
-          try {
-            const adminClient = createServerSupabaseClient();
-            const { data: usersData } = await adminClient.auth.admin.listUsers();
-            const supabaseUserRecord = usersData?.users?.find(
-              (u: any) => u.email?.toLowerCase() === email
-            );
-
-            if (supabaseUserRecord) {
-              console.log('[AUTH] User found in Supabase Auth:', email, '| confirmed:', !!supabaseUserRecord.email_confirmed_at);
-
-              // Check if email is verified
-              if (!supabaseUserRecord.email_confirmed_at) {
-                throw new Error("EMAIL_NOT_VERIFIED");
-              }
-
-              // The user exists in Supabase Auth. Their password might be
-              // corrupted or missing. Reset it with what they provided.
-              console.log('[AUTH] Resetting password for existing user:', email);
-              await adminClient.auth.admin.updateUserById(supabaseUserRecord.id, {
-                password: credentials.password,
-              });
-
-              // Now try signInWithPassword again
-              const signupClient = createSignupClient();
-              const retryResult = await signupClient.auth.signInWithPassword({
-                email,
-                password: credentials.password,
-              });
-
-              if (!retryResult.error && retryResult.data.user) {
-                console.log('[AUTH] Login succeeded after password reset for:', email);
-
-                // Ensure Prisma DB record exists
-                try {
-                  await db.user.upsert({
-                    where: { id: supabaseUserRecord.id },
-                    create: {
-                      id: supabaseUserRecord.id,
-                      email,
-                      name: supabaseUserRecord.user_metadata?.username || email.split("@")[0],
-                      emailVerified: new Date(supabaseUserRecord.email_confirmed_at),
-                      passwordHash: await bcrypt.hash(credentials.password, 12),
-                    },
-                    update: {
-                      emailVerified: new Date(supabaseUserRecord.email_confirmed_at),
-                      passwordHash: await bcrypt.hash(credentials.password, 12),
-                    },
-                  });
-                } catch (dbErr) {
-                  console.error('[AUTH] DB upsert failed (non-fatal):', dbErr);
-                }
-
-                return {
-                  id: supabaseUserRecord.id,
-                  email: supabaseUserRecord.email,
-                  name: supabaseUserRecord.user_metadata?.username || email.split("@")[0],
-                  emailVerified: new Date(supabaseUserRecord.email_confirmed_at),
-                };
-              } else {
-                console.error('[AUTH] Login still failed after password reset:', retryResult.error?.message);
-              }
-            } else {
-              console.log('[AUTH] User not found in Supabase Auth:', email);
-            }
-          } catch (adminErr) {
-            // Re-throw EMAIL_NOT_VERIFIED
-            if (adminErr instanceof Error && adminErr.message === "EMAIL_NOT_VERIFIED") {
-              throw adminErr;
-            }
-            console.error('[AUTH] Admin API fallback failed:', adminErr);
-          }
-
-          // ── Nothing worked ────────────────────────────────────────────────
+          // ── Nothing worked — invalid credentials ────────────────────────
           console.log('[AUTH] All login methods failed for:', email);
           throw new Error("Invalid email or password.");
 

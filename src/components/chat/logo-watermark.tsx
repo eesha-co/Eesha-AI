@@ -16,7 +16,7 @@ interface LogoWatermarkProps {
  * Used in Terminal, Workspace, CodeEditor, and other panels
  * when they have no content — like x.ai/z.ai's background branding.
  */
-export function LogoWatermark({ opacity = 0.15, sizeFraction = 0.4, className = '' }: LogoWatermarkProps) {
+export function LogoWatermark({ opacity = 0.06, sizeFraction = 0.4, className = '' }: LogoWatermarkProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   return (
@@ -32,7 +32,7 @@ export function LogoWatermark({ opacity = 0.15, sizeFraction = 0.4, className = 
           opacity,
           maxWidth: `${sizeFraction * 100}%`,
           maxHeight: `${sizeFraction * 100}%`,
-          filter: 'brightness(1.8) saturate(1.4) drop-shadow(0 0 40px rgba(139, 92, 246, 0.15))',
+          filter: 'brightness(1.5) saturate(1.2)',
         }}
       />
     </div>

@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // ── Update Prisma DB ──────────────────────────────────────────────────
+      // ── Update Prisma DB (upsert — works even if record doesn't exist) ────
       try {
         const { db } = await import('@/lib/db');
         const updateData: any = { emailVerified: new Date() };
@@ -163,10 +163,19 @@ export async function POST(request: NextRequest) {
           updateData.passwordHash = await bcrypt.hash(password, 12);
         }
 
-        await db.user.update({
+        // Use upsert — the DB record might not exist if signup's upsert failed
+        await db.user.upsert({
           where: { id: userId },
-          data: updateData,
+          create: {
+            id: userId,
+            email: normalizedEmail,
+            name: data.user.user_metadata?.username || normalizedEmail.split('@')[0],
+            emailVerified: new Date(),
+            passwordHash: updateData.passwordHash,
+          },
+          update: updateData,
         });
+        console.log('[VERIFY-OTP] DB record updated for:', normalizedEmail);
       } catch (dbError) {
         console.error('[VERIFY-OTP] DB update error (non-fatal):', dbError);
       }

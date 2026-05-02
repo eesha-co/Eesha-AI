@@ -26,14 +26,19 @@ function checkOtpRateLimit(identifier: string): { allowed: boolean; retryAfter?:
 
 // ─── POST /api/auth/verify-otp ────────────────────────────────────────────────
 //
-// Supabase OTP verification with fallback:
-//   1. Try verifyOtp({ type: 'signup' }) — for tokens from signUp()
-//   2. If that fails, try verifyOtp({ type: 'email' }) — for tokens from signInWithOtp()
-//   3. If success → mark email verified in DB + ensure password & bcrypt hash are saved
+// Supabase OTP verification:
+//   1. Call verifyOtp({ type: 'email' }) — confirms email & preserves password
+//   2. Update Prisma DB to mark email as verified
+//   3. Save bcrypt hash as backup (for Supabase downtime only)
 //
-// We try 'signup' first because our signup route now uses signUp() which
-// generates signup-type tokens. We fall back to 'email' for backward
-// compatibility with any existing users who got tokens from signInWithOtp().
+// ⚠️  CRITICAL: Do NOT call admin.updateUserById() here!
+//     Confirmed Supabase bug (supabase/auth#1578): admin.updateUserById()
+//     can wipe the encrypted_password field, making signInWithPassword()
+//     fail with "Invalid login credentials" even though the password was
+//     correctly set during signUp().
+//
+//     signUp() already stores the password. verifyOtp() already confirms
+//     the email. There is NO need to call admin.updateUserById() at all.
 
 export async function POST(request: NextRequest) {
   try {
@@ -72,40 +77,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });
     }
 
-    // ── Try verifyOtp — attempt 'signup' first, then 'email' ──────────────
+    // ── Verify OTP using type 'email' (replaces deprecated 'signup' type) ──
+    // The 'email' type is the current recommended type for email OTP verification.
+    // It handles both signup verification and magic link verification.
+    // The 'signup' type is deprecated (supabase/supabase#27883).
+    console.log('[VERIFY-OTP] Attempting type=email for:', normalizedEmail);
     let data: any = null;
     let lastError: any = null;
 
-    // Attempt 1: type 'signup' (for signUp-generated tokens)
-    console.log('[VERIFY-OTP] Attempting type=signup for:', normalizedEmail);
-    const signupResult = await anonClient.auth.verifyOtp({
+    const emailResult = await anonClient.auth.verifyOtp({
       email: normalizedEmail,
       token: otp,
-      type: 'signup',
+      type: 'email',
     });
 
-    if (!signupResult.error) {
-      data = signupResult.data;
-      console.log('[VERIFY-OTP] Success with type=signup');
+    if (!emailResult.error) {
+      data = emailResult.data;
+      console.log('[VERIFY-OTP] Success with type=email');
     } else {
-      console.log('[VERIFY-OTP] type=signup failed:', signupResult.error.message);
-      lastError = signupResult.error;
+      console.log('[VERIFY-OTP] type=email failed:', emailResult.error.message);
+      lastError = emailResult.error;
 
-      // Attempt 2: type 'email' (for signInWithOtp-generated tokens)
-      console.log('[VERIFY-OTP] Falling back to type=email for:', normalizedEmail);
-      const emailResult = await anonClient.auth.verifyOtp({
+      // Fallback: try type 'signup' for backward compatibility with older tokens
+      console.log('[VERIFY-OTP] Falling back to type=signup for:', normalizedEmail);
+      const signupResult = await anonClient.auth.verifyOtp({
         email: normalizedEmail,
         token: otp,
-        type: 'email',
+        type: 'signup',
       });
 
-      if (!emailResult.error) {
-        data = emailResult.data;
+      if (!signupResult.error) {
+        data = signupResult.data;
         lastError = null;
-        console.log('[VERIFY-OTP] Success with type=email');
+        console.log('[VERIFY-OTP] Success with type=signup (fallback)');
       } else {
-        console.log('[VERIFY-OTP] type=email also failed:', emailResult.error.message);
-        lastError = emailResult.error;
+        console.log('[VERIFY-OTP] type=signup also failed:', signupResult.error.message);
+        lastError = signupResult.error;
       }
     }
 
@@ -136,52 +143,36 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // ── Success — update our DB & ensure password is saved ──────────────────
+    // ── Success — update Prisma DB ─────────────────────────────────────────
+    // NOTE: We do NOT call admin.updateUserById() here!
+    // signUp() already stored the password in Supabase Auth.
+    // verifyOtp() already confirmed the email.
+    // Calling admin.updateUserById() can WIPE the password (supabase/auth#1578).
+
     if (data.user) {
       const userId = data.user.id;
 
-      // ── Ensure password is set in Supabase Auth ──────────────────────────
-      // signUp() should save the password, but we explicitly set it here
-      // as a safeguard. This uses the admin API because the user's session
-      // from verifyOtp may not have permission to update their own password.
-      if (password && typeof password === 'string' && password.length >= 8) {
-        try {
-          const adminClient = createServerSupabaseClient();
-          await adminClient.auth.admin.updateUserById(userId, { password });
-          console.log('[VERIFY-OTP] Password ensured in Supabase Auth for:', normalizedEmail);
-        } catch (pwErr) {
-          console.error('[VERIFY-OTP] Could not save password to Supabase Auth:', pwErr);
-          // Non-fatal — the user is still verified, signUp() should have the password
-        }
-      }
-
-      // ── Update Prisma DB ──────────────────────────────────────────────────
-      // Always upsert by email (not by id) to avoid duplicate records.
-      // The signup route creates by email, so we match on email here too.
       try {
         const { db } = await import('@/lib/db');
         const updateData: Record<string, any> = {
           emailVerified: new Date(),
         };
 
-        // Save bcrypt hash as backup for the local fallback in auth.ts
+        // Save bcrypt hash as backup (only used if Supabase Auth is down)
         if (password && typeof password === 'string' && password.length >= 8) {
           updateData.passwordHash = await bcrypt.hash(password, 12);
         }
 
-        // Upsert by email — matches what the signup route does
-        // This avoids creating duplicates if the ID format differs
+        // Find existing user by email (consistent with signup route)
         const existingUser = await db.user.findUnique({ where: { email: normalizedEmail } });
 
         if (existingUser) {
-          // Update existing record — keep the existing ID, just update fields
           await db.user.update({
             where: { id: existingUser.id },
             data: updateData,
           });
           console.log('[VERIFY-OTP] DB record updated for:', normalizedEmail);
         } else {
-          // Create new record — use Supabase Auth user ID
           await db.user.create({
             data: {
               id: userId,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSignupClient, createServerSupabaseClient } from '@/lib/supabase-server';
+import bcrypt from 'bcryptjs';
 
 // ─── Rate limiting for OTP verification attempts ──────────────────────────────
 const otpAttempts = new Map<string, { count: number; resetTime: number }>();
@@ -35,7 +36,7 @@ function checkOtpRateLimit(identifier: string): { allowed: boolean; retryAfter?:
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, otp } = body;
+    const { email, otp, password } = body;
 
     // ── Input validation ────────────────────────────────────────────────────
     if (!email || typeof email !== 'string') {
@@ -102,13 +103,37 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // ── Success — update our DB ─────────────────────────────────────────────
+    // ── Success — update our DB & ensure password is saved ──────────────────
     if (data.user) {
+      const userId = data.user.id;
+
+      // ── Ensure password is set in Supabase Auth ──────────────────────────
+      // Critical fix: admin.createUser() + signInWithOtp() combo can sometimes
+      // result in the password not being persisted. We explicitly set it here.
+      if (password && typeof password === 'string') {
+        try {
+          const adminClient = createServerSupabaseClient();
+          await adminClient.auth.admin.updateUserById(userId, { password });
+          console.log('[VERIFY-OTP] Password saved to Supabase Auth for:', normalizedEmail);
+        } catch (pwErr) {
+          console.error('[VERIFY-OTP] Could not save password to Supabase Auth:', pwErr);
+          // Non-fatal — the user is still verified
+        }
+      }
+
+      // ── Update Prisma DB ──────────────────────────────────────────────────
       try {
         const { db } = await import('@/lib/db');
+        const updateData: any = { emailVerified: new Date() };
+
+        // Also save bcrypt hash as a backup for the fallback in auth.ts
+        if (password && typeof password === 'string') {
+          updateData.passwordHash = await bcrypt.hash(password, 12);
+        }
+
         await db.user.update({
-          where: { id: data.user.id },
-          data: { emailVerified: new Date() },
+          where: { id: userId },
+          data: updateData,
         });
       } catch (dbError) {
         console.error('[VERIFY-OTP] DB update error (non-fatal):', dbError);

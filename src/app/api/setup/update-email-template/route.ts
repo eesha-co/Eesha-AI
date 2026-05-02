@@ -108,16 +108,22 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Method 2: Try session pooler (port 5432) ────────────────────────
-    // Format: postgresql://postgres.PROJECT_REF:PASSWORD@pooler.supabase.com:5432/postgres
-    const dbPassword = 'hLz0TXpX16Gzj9EK';
-    const sessionPoolerUrl = `postgresql://postgres.xydfeerrrtlgrxmtepjo:${encodeURIComponent(dbPassword)}@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require`;
+    // Use SUPABASE_DB_PASSWORD env var instead of hardcoded password
+    const dbPassword = process.env.SUPABASE_DB_PASSWORD || '';
+    const projectRef = (process.env.SUPABASE_URL || '').replace('https://', '').replace('.supabase.co', '');
     
-    allResults.push('--- Trying session pooler (port 5432) ---');
-    const result2 = await tryPgConnection(sessionPoolerUrl);
-    allResults.push(...result2.results);
-    if (result2.error) allResults.push(`Error: ${result2.error}`);
-    if (result2.connected && result2.results.some(r => r.startsWith('OK:'))) {
-      return NextResponse.json({ success: true, message: 'Email template updated via session pooler', results: allResults });
+    if (dbPassword && projectRef) {
+      const sessionPoolerUrl = `postgresql://postgres.${projectRef}:${encodeURIComponent(dbPassword)}@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require`;
+      
+      allResults.push('--- Trying session pooler (port 5432) ---');
+      const result2 = await tryPgConnection(sessionPoolerUrl);
+      allResults.push(...result2.results);
+      if (result2.error) allResults.push(`Error: ${result2.error}`);
+      if (result2.connected && result2.results.some(r => r.startsWith('OK:'))) {
+        return NextResponse.json({ success: true, message: 'Email template updated via session pooler', results: allResults });
+      }
+    } else {
+      allResults.push('--- Skipping session pooler: SUPABASE_DB_PASSWORD not set ---');
     }
 
     // ── Method 3: Try transaction pooler with Prisma ─────────────────────

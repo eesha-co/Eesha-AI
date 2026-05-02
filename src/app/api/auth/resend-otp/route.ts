@@ -15,8 +15,6 @@ const lastResendTime = new Map<string, number>();
 //   1. Verify user exists and isn't already confirmed
 //   2. Call resend({ type: 'signup' }) — resends the verification email
 //   3. Done
-//
-// This uses the standard Supabase resend() method which works with signUp().
 
 export async function POST(request: NextRequest) {
   try {
@@ -82,8 +80,6 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Resend verification email ──────────────────────────────────────────
-    // Use resend() with type 'signup' — this is the standard way to resend
-    // verification emails for signUp()-created users.
     let anonClient;
     try {
       anonClient = createSignupClient();
@@ -92,7 +88,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });
     }
 
-    // Try type 'signup' first (for signUp-created users), then 'emailchange' or 'magiclink'
+    // Try type 'signup' first (standard for signUp-created users)
     console.log('[RESEND-OTP] Resending with type=signup for:', emailKey);
     const { error: resendError } = await anonClient.auth.resend({
       type: 'signup',
@@ -103,7 +99,6 @@ export async function POST(request: NextRequest) {
       console.error('[RESEND-OTP] resend(signup) failed:', resendError.message);
 
       // Fallback: try signInWithOtp as a last resort
-      // This handles cases where the user was created with the old admin.createUser + signInWithOtp flow
       console.log('[RESEND-OTP] Falling back to signInWithOtp for:', emailKey);
       const { error: otpError } = await anonClient.auth.signInWithOtp({
         email: emailKey,

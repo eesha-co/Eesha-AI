@@ -4,11 +4,8 @@ import { db } from '@/lib/db';
 
 // ─── Rate limiting for OTP verification attempts ──────────────────────────────
 const otpAttempts = new Map<string, { count: number; resetTime: number }>();
-const MAX_OTP_ATTEMPTS = 10;       // generous — wrong codes are not a security risk
-const OTP_WINDOW_MS = 15 * 60_000; // 15 minutes
-
-// Supabase OTP expiry — default is 3600s (1 hour).
-const OTP_EXPIRY_SECONDS = 3600;
+const MAX_OTP_ATTEMPTS = 10;
+const OTP_WINDOW_MS = 15 * 60_000;
 
 function checkOtpRateLimit(identifier: string): { allowed: boolean; retryAfter?: number } {
   const now = Date.now();
@@ -27,50 +24,17 @@ function checkOtpRateLimit(identifier: string): { allowed: boolean; retryAfter?:
   return { allowed: true };
 }
 
-// ─── Helper: Send OTP code (same as in signup route) ─────────────────────────
-async function sendOtpCode(signupClient: ReturnType<typeof createSignupClient>, email: string): Promise<{ sent: boolean; error?: string }> {
-  // Attempt 1: with shouldCreateUser: false
-  try {
-    const { error } = await signupClient.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: false },
-    });
-    if (!error) {
-      console.log('[VERIFY-OTP] OTP resent via signInWithOtp (shouldCreateUser: false)');
-      return { sent: true };
-    }
-    console.warn('[VERIFY-OTP] signInWithOtp attempt 1 failed:', error.message);
-  } catch (e) {
-    console.warn('[VERIFY-OTP] signInWithOtp attempt 1 exception:', e);
-  }
-
-  // Attempt 2: without flag
-  try {
-    const { error } = await signupClient.auth.signInWithOtp({ email });
-    if (!error) {
-      console.log('[VERIFY-OTP] OTP resent via signInWithOtp (no flag)');
-      return { sent: true };
-    }
-    return { sent: false, error: error.message };
-  } catch (e) {
-    return { sent: false, error: String(e) };
-  }
-}
-
 // ─── POST /api/auth/verify-otp ────────────────────────────────────────────────
 //
-// BULLETPROOF verification flow:
+// Clean verification flow:
 //
-//   1. Try verifyOtp() with ALL token types (email first, then signup, then recovery)
-//      - We prioritize 'email' because our signup route sends OTP via signInWithOtp()
-//        which generates 'email' type tokens
-//   2. If all fail, use admin API to diagnose:
-//      - If confirmation_sent_at exists and is recent → code is WRONG
-//      - If confirmation_sent_at exists and is old → code is EXPIRED → auto-resend
-//      - If confirmation_sent_at is null → no code was sent → auto-resend
-//   3. After auto-resend, tell user to check email for the new code
-//
-// We NEVER tell the user to "go back and sign up again" — we always auto-recover.
+//   1. Try verifyOtp() with token types in priority order:
+//      - 'signup' first (signUp() is the primary email sender)
+//      - 'email' second (signInWithOtp() / resend-otp uses this type)
+//   2. If all fail, check if user is already verified (maybe they clicked a link)
+//   3. Return clear, actionable error messages — NO auto-resend
+//      (auto-resend caused "Could not send a new verification code" errors
+//       due to Supabase's 60-second email rate limit)
 
 export async function POST(request: NextRequest) {
   try {
@@ -102,12 +66,12 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Verify OTP with Supabase ────────────────────────────────────────────
-    // Try 'email' type FIRST because our signup route sends OTP via signInWithOtp()
-    // which generates 'email' type tokens. The 'signup' type from signUp() may not
-    // work if the template sends links instead of codes.
+    // Token type priority:
+    //   1. 'signup' — from signUp() (the primary email sender in our signup route)
+    //   2. 'email'  — from signInWithOtp() (used by resend-otp and admin fallback)
     const signupClient = createSignupClient();
 
-    const tokenTypes = ['email', 'signup', 'recovery'] as const;
+    const tokenTypes = ['signup', 'email'] as const;
     let lastError: { message: string; status?: number } | null = null;
     let verifiedData: any = null;
 
@@ -127,19 +91,19 @@ export async function POST(request: NextRequest) {
       if (error) {
         console.warn(`[VERIFY-OTP] type '${type}' failed:`, error.message);
         lastError = { message: error.message, status: error.status };
-        // Only try other types for "expired/invalid" errors
+        // Only continue to next type for "expired/invalid" errors
+        // Other errors (rate limit, etc.) should stop immediately
         if (!error.message.includes('expired') && !error.message.includes('invalid')) {
           break;
         }
       }
     }
 
-    // ── If verification failed, auto-recover ────────────────────────────────
+    // ── If verification failed, check if user is already verified ──────────
+    // This handles the case where the user clicked a verification link
+    // in their email instead of entering the code.
     if (!verifiedData && lastError) {
       console.error('[VERIFY-OTP] All types failed. Last error:', lastError.message);
-
-      let specificError: string;
-      let shouldResend = false;
 
       try {
         const adminClient = createServerSupabaseClient();
@@ -148,54 +112,60 @@ export async function POST(request: NextRequest) {
           (u) => u.email?.toLowerCase() === normalizedEmail
         );
 
-        if (!user) {
-          // User not found in Supabase Auth at all
-          specificError = 'No account found with this email. Please sign up first.';
-        } else if (user.confirmation_sent_at) {
-          const sentAt = new Date(user.confirmation_sent_at).getTime();
-          const now = Date.now();
-          const elapsedSeconds = (now - sentAt) / 1000;
+        if (user?.email_confirmed_at) {
+          // User is already verified — they must have clicked the link
+          console.log('[VERIFY-OTP] User already verified (likely via link click):', normalizedEmail);
 
-          console.log(`[VERIFY-OTP] confirmation_sent_at: ${user.confirmation_sent_at}, elapsed: ${elapsedSeconds.toFixed(0)}s`);
+          // Update our DB too
+          try {
+            await db.user.update({
+              where: { id: user.id },
+              data: { emailVerified: new Date(user.email_confirmed_at) },
+            });
+          } catch {}
 
-          if (elapsedSeconds > OTP_EXPIRY_SECONDS) {
-            // Code expired — auto-resend
-            shouldResend = true;
-            specificError = 'Your verification code has expired. A new code has been sent to your email.';
-          } else {
-            // Code was sent recently but is wrong
-            specificError = 'Incorrect verification code. Please check the code and try again.';
-          }
-        } else {
-          // confirmation_sent_at is null — no code was recorded as sent
-          // This happens when signUp() sent a LINK instead of a code
-          shouldResend = true;
-          specificError = 'No active verification code was found. A new code has been sent to your email.';
+          return NextResponse.json({
+            success: true,
+            message: 'Your email is already verified! You can sign in now.',
+            alreadyVerified: true,
+          });
         }
+
+        if (!user) {
+          return NextResponse.json({
+            error: 'No account found with this email. Please sign up first.',
+          }, { status: 400 });
+        }
+
+        // User exists but not verified — determine why the code failed
+        if (user.confirmation_sent_at) {
+          const sentAt = new Date(user.confirmation_sent_at).getTime();
+          const elapsedSeconds = (Date.now() - sentAt) / 1000;
+
+          if (elapsedSeconds > 3600) {
+            // Code expired (1 hour default)
+            return NextResponse.json({
+              error: 'Your verification code has expired. Click "Resend" to get a new one.',
+            }, { status: 400 });
+          }
+
+          // Code was sent recently but is wrong
+          return NextResponse.json({
+            error: 'Incorrect verification code. Please double-check the code and try again. Make sure you\'re using the most recent code sent to your email.',
+          }, { status: 400 });
+        }
+
+        // No confirmation_sent_at — the email template might send a link, not a code
+        return NextResponse.json({
+          error: 'Verification failed. Your email may contain a verification link instead of a code — try clicking the link in the email. If you only see a code, click "Resend" to get a fresh one.',
+        }, { status: 400 });
+
       } catch (adminError) {
         console.error('[VERIFY-OTP] Admin lookup failed:', adminError);
-        // On admin API failure, still try to resend
-        shouldResend = true;
-        specificError = 'Verification failed. A new code has been sent to your email.';
+        return NextResponse.json({
+          error: 'Verification failed. Please try again or click "Resend" to get a new code.',
+        }, { status: 400 });
       }
-
-      // Auto-resend OTP if needed
-      if (shouldResend) {
-        console.log('[VERIFY-OTP] Auto-resending OTP for:', normalizedEmail);
-        const otpResult = await sendOtpCode(signupClient, normalizedEmail);
-        if (otpResult.sent) {
-          specificError = specificError.replace(
-            'A new code has been sent to your email.',
-            'A new code has been sent to your email. Please wait a moment and check your inbox.'
-          );
-        } else {
-          // Even resend failed — give user actionable advice
-          console.error('[VERIFY-OTP] Auto-resend failed:', otpResult.error);
-          specificError = 'Your verification code may have expired. Click "Resend" below to get a new one.';
-        }
-      }
-
-      return NextResponse.json({ error: specificError }, { status: 400 });
     }
 
     if (!verifiedData) {

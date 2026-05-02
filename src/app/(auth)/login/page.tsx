@@ -201,14 +201,17 @@ export default function LoginPage() {
           {/* Email + Password form */}
           <form onSubmit={handleEmailLogin} className="space-y-4">
             <div>
-              <label className="mb-2 block text-xs font-medium text-muted-foreground">Email address</label>
+              <label htmlFor="login-email" className="mb-2 block text-xs font-medium text-muted-foreground">Email address</label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <input
+                  id="login-email"
+                  name="email"
                   type="email"
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setError(''); }}
                   placeholder="you@example.com"
+                  autoComplete="email"
                   autoFocus
                   className="w-full rounded-xl border border-border bg-card py-3.5 pl-11 pr-4 text-sm text-foreground placeholder-muted-foreground outline-none transition-all focus:border-primary/50 focus:bg-accent focus:ring-2 focus:ring-primary/30"
                 />
@@ -216,14 +219,17 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="mb-2 block text-xs font-medium text-muted-foreground">Password</label>
+              <label htmlFor="login-password" className="mb-2 block text-xs font-medium text-muted-foreground">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <input
+                  id="login-password"
+                  name="password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setError(''); }}
                   placeholder="Enter your password"
+                  autoComplete="current-password"
                   className="w-full rounded-xl border border-border bg-card py-3.5 pl-11 pr-11 text-sm text-foreground placeholder-muted-foreground outline-none transition-all focus:border-primary/50 focus:bg-accent focus:ring-2 focus:ring-primary/30"
                 />
                 <button

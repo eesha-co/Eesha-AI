@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Github, Mail, Shield, Infinity, MessageSquare,
   Code2, Terminal, Eye, EyeOff, Lock, ArrowRight, Check,
-  AlertCircle, RefreshCw, Brain, Zap
+  AlertCircle, RefreshCw, Brain, KeyRound, Zap
 } from 'lucide-react';
 import { SmokyBackground } from '@/components/chat/smoky-background';
 
@@ -15,7 +15,7 @@ interface ProviderInfo {
   name: string;
 }
 
-type Step = 'email' | 'username' | 'password' | 'policy' | 'success';
+type Step = 'email' | 'username' | 'password' | 'policy' | 'verify' | 'success';
 
 // ─── Password Strength Indicator ──────────────────────────────────────────────
 function getPasswordStrength(password: string): {
@@ -34,15 +34,61 @@ function getPasswordStrength(password: string): {
   return { score, label: 'Strong', color: 'bg-emerald-500' };
 }
 
-// ─── Step Label Helper ────────────────────────────────────────────────────────
-function getStepLabel(step: Step): string {
-  switch (step) {
-    case 'email': return 'Email';
-    case 'username': return 'Username';
-    case 'password': return 'Password';
-    case 'policy': return 'Agreement';
-    case 'success': return 'Done';
-  }
+// ─── OTP Input Component ──────────────────────────────────────────────────────
+function OTPInput({ value, onChange, disabled, digits = 6 }: {
+  value: string;
+  onChange: (val: string) => void;
+  disabled?: boolean;
+  digits?: number;
+}) {
+  const handleChange = (index: number, digit: string) => {
+    if (!/^\d*$/.test(digit)) return;
+    const newVal = value.split('');
+    newVal[index] = digit.slice(-1);
+    onChange(newVal.join('').padEnd(value.length).slice(0, digits));
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !value[index] && index > 0) {
+      const prev = document.getElementById(`otp-${index - 1}`);
+      prev?.focus();
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, digits);
+    if (pasted.length > 0) {
+      onChange(pasted.padEnd(value.length).slice(0, digits));
+    }
+  };
+
+  return (
+    <div className="flex justify-center gap-2">
+      {Array.from({ length: digits }).map((_, i) => (
+        <input
+          key={i}
+          id={`otp-${i}`}
+          name={`otp-digit-${i}`}
+          type="text"
+          inputMode="numeric"
+          maxLength={1}
+          value={value[i] || ''}
+          onChange={(e) => {
+            handleChange(i, e.target.value);
+            if (e.target.value && i < digits - 1) {
+              document.getElementById(`otp-${i + 1}`)?.focus();
+            }
+          }}
+          onKeyDown={(e) => handleKeyDown(i, e)}
+          onPaste={handlePaste}
+          disabled={disabled}
+          aria-label={`Digit ${i + 1} of verification code`}
+          className="size-11 rounded-lg border border-border bg-card text-center text-lg font-bold text-foreground outline-none transition-all focus:border-primary/50 focus:bg-accent focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
+        />
+      ))}
+    </div>
+  );
 }
 
 // ─── Signup Page ──────────────────────────────────────────────────────────────
@@ -58,16 +104,26 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [agreedToPolicy, setAgreedToPolicy] = useState(false);
+  const [otp, setOtp] = useState('');
 
   // UI state
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [hasResent, setHasResent] = useState(false);
 
   useEffect(() => {
     getProviders().then((p) => {
       if (p) setProviders(p as Record<string, ProviderInfo>);
     });
   }, []);
+
+  // Resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown(prev => prev - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
 
   const hasGithub = !!providers['github'];
 
@@ -137,18 +193,134 @@ export default function SignupPage() {
       const data = await res.json();
 
       if (!res.ok) {
+        // Special case: user already exists — if they're unverified, auto-resend
         if (res.status === 409) {
-          setError('An account with this email already exists. Please log in instead.');
-          return;
+          console.log('[SIGNUP] User already exists, trying to resend verification');
+          const otpRes = await fetch('/api/auth/resend-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          if (otpRes.ok) {
+            const otpData = await otpRes.json();
+            if (otpData.alreadyVerified) {
+              setError('This email is already registered and verified. Please log in instead.');
+              return;
+            }
+            setStep('verify');
+            setResendCooldown(60);
+            setHasResent(true);
+            return;
+          }
         }
         setError(data.error || 'Sign-up failed. Please try again.');
         return;
       }
 
-      // Account created successfully — go to success step
-      setStep('success');
+      if (data.emailConfirmed) {
+        setStep('success');
+        return;
+      }
+
+      // Need to verify email with OTP
+      setStep('verify');
+      setResendCooldown(60);
     } catch {
       setError('Network error. Please check your connection and try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ── Step 5: Verify OTP ───────────────────────────────────────────────────
+  const handleVerifyOtp = async () => {
+    setError('');
+    if (otp.length !== 6) {
+      setError('Please enter the 6-digit verification code.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Verification failed.');
+        return;
+      }
+
+      // Handle already-verified case (user clicked link)
+      if (data.alreadyVerified) {
+        setStep('success');
+        return;
+      }
+
+      setStep('success');
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ── Check if already verified (for link-click case) ─────────────────────
+  const handleCheckVerification = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/auth/check-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+
+      if (data.status === 'verified' || data.status === 'found') {
+        setStep('success');
+        return;
+      }
+
+      setError('Your email is not verified yet. Please enter the code or click the link in your email.');
+    } catch {
+      setError('Could not check verification status. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ── Resend OTP ───────────────────────────────────────────────────────────
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0) return;
+    setError('');
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/auth/resend-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+
+      if (data.alreadyVerified) {
+        setStep('success');
+        return;
+      }
+
+      if (!res.ok) {
+        setError(data.error || 'Could not resend code.');
+      } else {
+        setResendCooldown(60);
+        setHasResent(true);
+        setError('');
+        setOtp('');
+      }
+    } catch {
+      setError('Network error. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -168,7 +340,6 @@ export default function SignupPage() {
       if (result?.ok) {
         window.location.href = '/';
       } else {
-        // If auto sign-in fails, redirect to login page
         window.location.href = '/login';
       }
     } catch {
@@ -183,12 +354,12 @@ export default function SignupPage() {
   };
 
   // ── Step indicator ───────────────────────────────────────────────────────
-  const signupSteps: Step[] = ['email', 'username', 'password', 'policy', 'success'];
+  const signupSteps: Step[] = ['email', 'username', 'password', 'policy', 'verify', 'success'];
   const currentStepIndex = signupSteps.indexOf(step);
 
   const StepIndicator = () => {
-    const visibleSteps: Step[] = ['email', 'username', 'password', 'policy'];
-    const activeIndex = step === 'success' ? 3 : currentStepIndex;
+    const visibleSteps: Step[] = ['email', 'username', 'password', 'policy', 'verify'];
+    const activeIndex = step === 'success' ? 4 : currentStepIndex;
 
     return (
       <div className="flex items-center gap-1 mb-8">
@@ -251,7 +422,7 @@ export default function SignupPage() {
           <div className="space-y-4 mt-4">
             {[
               { icon: Brain, title: 'Multi-Agent Architecture', desc: 'Draft → Critique → Consensus pipeline' },
-              { icon: Shield, title: 'Enterprise Security', desc: 'End-to-end encryption & bcrypt password hashing' },
+              { icon: Shield, title: 'Enterprise Security', desc: 'End-to-end encryption, bcrypt & email verification' },
               { icon: Code2, title: 'Workspace & Terminal', desc: 'Full development environment access' },
               { icon: Infinity, title: 'Unlimited Conversations', desc: 'No caps on messages or sessions' },
             ].map(({ icon: Icon, title, desc }) => (
@@ -271,7 +442,7 @@ export default function SignupPage() {
         {/* Bottom security notice */}
         <div className="flex items-center gap-2">
           <Shield className="size-3.5 text-muted-foreground/60" />
-          <span className="text-xs text-muted-foreground/60">Protected by bcrypt encryption & secure password hashing</span>
+          <span className="text-xs text-muted-foreground/60">Protected by bcrypt encryption & email verification</span>
         </div>
       </div>
 
@@ -297,10 +468,13 @@ export default function SignupPage() {
           {/* Header */}
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-foreground">
-              {step === 'success' ? 'Account Created!' : 'Create your account'}
+              {step === 'success' ? 'Email Verified!' :
+               step === 'verify' ? 'Verify your email' :
+               'Create your account'}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
               {step === 'success' ? 'Your account is ready. Sign in to get started.' :
+               step === 'verify' ? <>Enter the 6-digit code sent to <strong className="text-foreground">{email}</strong></> :
                'Sign up to unlock unlimited AI conversations.'}
             </p>
           </div>
@@ -613,7 +787,91 @@ export default function SignupPage() {
               </motion.div>
             )}
 
-            {/* Step 5: Success */}
+            {/* Step 5: OTP Verification */}
+            {step === 'verify' && (
+              <motion.div
+                key="verify"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-5"
+              >
+                <div className="flex justify-center">
+                  <div className="flex size-16 items-center justify-center rounded-full bg-violet-600/10 border border-violet-500/20">
+                    <KeyRound className="size-7 text-primary" />
+                  </div>
+                </div>
+
+                <div className="text-center space-y-1">
+                  <p className="text-sm text-muted-foreground">
+                    Check your email for a 6-digit verification code
+                  </p>
+                  <p className="text-xs text-muted-foreground/70">
+                    If your email contains a verification link instead, click it to verify
+                  </p>
+                </div>
+
+                <OTPInput value={otp} onChange={setOtp} disabled={isLoading} digits={6} />
+
+                <button
+                  onClick={handleVerifyOtp}
+                  disabled={isLoading || otp.length !== 6}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-emerald-600 px-4 py-3.5 text-sm font-semibold text-white transition-all hover:from-violet-500 hover:to-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? (
+                    <RefreshCw className="size-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Shield className="size-4" />
+                      Verify Email
+                    </>
+                  )}
+                </button>
+
+                <div className="text-center space-y-2">
+                  {resendCooldown > 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Resend code in <span className="text-primary">{resendCooldown}s</span>
+                    </p>
+                  ) : (
+                    <button
+                      onClick={handleResendOtp}
+                      disabled={isLoading}
+                      className="text-xs text-primary hover:text-primary/80 transition-colors"
+                    >
+                      Didn&apos;t get a code? Resend
+                    </button>
+                  )}
+
+                  <button
+                    onClick={handleCheckVerification}
+                    disabled={isLoading}
+                    className="block mx-auto text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Already clicked the link? Check status
+                  </button>
+                </div>
+
+                {hasResent && (
+                  <div className="flex items-center gap-2 rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3">
+                    <AlertCircle className="size-4 shrink-0 text-blue-500 dark:text-blue-400" />
+                    <span className="text-xs text-blue-700 dark:text-blue-200">
+                      A new code has been sent. Use the code from the LATEST email — previous codes are no longer valid.
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+                  <AlertCircle className="size-4 shrink-0 text-amber-500 dark:text-amber-400" />
+                  <span className="text-xs text-amber-700 dark:text-amber-200">
+                    Your account is locked until you verify your email. This protects your data from unauthorized access.
+                  </span>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step 6: Success */}
             {step === 'success' && (
               <motion.div
                 key="success"
@@ -629,10 +887,10 @@ export default function SignupPage() {
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">
-                    Welcome, <strong className="text-foreground">@{username}</strong>! Your account has been created successfully.
+                    Welcome, <strong className="text-foreground">@{username}</strong>! Your email has been verified and your account is ready.
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Your credentials are securely stored. Click below to sign in and start coding with AI.
+                    Click below to sign in and start coding with AI.
                   </p>
                 </div>
                 <button
@@ -654,7 +912,7 @@ export default function SignupPage() {
           </AnimatePresence>
 
           {/* Toggle login */}
-          {step !== 'success' && (
+          {step !== 'success' && step !== 'verify' && (
             <div className="mt-8 text-center text-sm text-muted-foreground">
               Already have an account?{' '}
               <button
@@ -670,7 +928,7 @@ export default function SignupPage() {
           <div className="mt-6 flex items-center justify-center gap-1.5">
             <Shield className="size-3 text-foreground/15" />
             <span className="text-[10px] text-foreground/15">
-              Protected by bcrypt encryption &amp; secure password hashing
+              Protected by bcrypt encryption, email verification &amp; secure password hashing
             </span>
           </div>
         </div>

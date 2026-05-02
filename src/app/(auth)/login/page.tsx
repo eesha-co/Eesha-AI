@@ -59,10 +59,12 @@ export default function LoginPage() {
 
       if (result?.error) {
         // NextAuth maps thrown Errors to the error string.
-        // Our authorize() throws: NO_ACCOUNT, INVALID_PASSWORD
+        // Our authorize() throws: EMAIL_NOT_VERIFIED, NO_ACCOUNT, INVALID_PASSWORD
         const errType = result.error;
 
-        if (errType === 'NO_ACCOUNT') {
+        if (errType === 'EMAIL_NOT_VERIFIED') {
+          setError('Your email has not been verified yet. Please check your email for a verification code, or sign up again to resend it.');
+        } else if (errType === 'NO_ACCOUNT') {
           setError('No account found with this email. Please sign up first.');
         } else if (errType === 'INVALID_PASSWORD') {
           setError('Incorrect password. Please try again.');

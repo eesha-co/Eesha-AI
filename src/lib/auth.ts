@@ -8,7 +8,6 @@ import { db } from "@/lib/db";
 export const authOptions: NextAuthOptions = {
   // ─── Database Adapter ────────────────────────────────────────────────────
   // PrismaAdapter connects to Supabase PostgreSQL via DATABASE_URL.
-  // All data (users, sessions, conversations) lives in Supabase — NOT local storage.
   adapter: PrismaAdapter(db),
 
   // ─── Authentication Providers ─────────────────────────────────────────────
@@ -38,8 +37,6 @@ export const authOptions: NextAuthOptions = {
 
         try {
           // ── Look up user in our `users` table ────────────────────────────
-          // The `users` table lives in Supabase PostgreSQL (via Prisma).
-          // It stores: email, name (username), passwordHash (bcrypt), emailVerified
           console.log('[AUTH] Looking up user in users table:', email);
 
           const user = await db.user.findUnique({ where: { email } });
@@ -56,14 +53,18 @@ export const authOptions: NextAuthOptions = {
           }
 
           // ── Compare input password against bcrypt hash ───────────────────
-          // bcrypt.compare() hashes the input and compares against the stored hash.
-          // The stored hash was created by bcrypt.hash(password, 12) during signup.
           console.log('[AUTH] Comparing password with bcrypt hash for:', email);
           const passwordMatches = await bcrypt.compare(credentials.password, user.passwordHash);
 
           if (!passwordMatches) {
             console.log('[AUTH] Password does not match for:', email);
             throw new Error("INVALID_PASSWORD");
+          }
+
+          // ── Check email verification ─────────────────────────────────────
+          if (!user.emailVerified) {
+            console.log('[AUTH] Email not verified:', email);
+            throw new Error("EMAIL_NOT_VERIFIED");
           }
 
           // ── Success — return the user ────────────────────────────────────

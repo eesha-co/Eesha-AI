@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
 
 // ─── POST /api/auth/check-status ────────────────────────────────────────────
-// Checks whether an email is registered and verified in Supabase Auth.
+// Checks whether an email is registered and verified in our `users` table.
 // Used by the login page to give specific error messages after a failed login.
 
 export async function POST(request: NextRequest) {
@@ -16,32 +15,8 @@ export async function POST(request: NextRequest) {
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    let adminClient;
-    try {
-      adminClient = createServerSupabaseClient();
-    } catch {
-      return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });
-    }
-
-    // Look up the user in Supabase Auth
-    let page = 1;
-    let user: any = null;
-
-    while (!user) {
-      const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage: 50 });
-      if (error) {
-        console.error('[CHECK-STATUS] listUsers error:', error.message);
-        return NextResponse.json({ error: 'Could not check account status.' }, { status: 500 });
-      }
-
-      user = data?.users?.find((u: any) => u.email?.toLowerCase() === normalizedEmail);
-
-      if (!user && (data?.users?.length ?? 0) >= 50) {
-        page++;
-      } else {
-        break;
-      }
-    }
+    const { db } = await import('@/lib/db');
+    const user = await db.user.findUnique({ where: { email: normalizedEmail } });
 
     if (!user) {
       return NextResponse.json({
@@ -52,7 +27,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (user.email_confirmed_at) {
+    if (user.emailVerified) {
       return NextResponse.json({
         exists: true,
         verified: true,

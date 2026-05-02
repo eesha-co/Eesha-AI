@@ -55,12 +55,12 @@ function ThemeToggle() {
   ];
 
   return (
-    <div className="flex items-center gap-0.5 rounded-lg bg-[var(--surface-secondary)] p-0.5">
+    <div className="flex items-center gap-0.5 rounded-md bg-[var(--surface-secondary)] p-0.5">
       {modes.map(({ key, icon: Icon, label }) => (
         <button
           key={key}
           onClick={() => setThemeMode(key)}
-          className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-all ${
+          className={`flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] transition-all ${
             themeMode === key
               ? 'bg-[var(--surface-primary)] text-foreground shadow-sm'
               : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
@@ -68,7 +68,6 @@ function ThemeToggle() {
           title={label}
         >
           <Icon className="size-3" />
-          <span className="hidden md:inline">{label}</span>
         </button>
       ))}
     </div>
@@ -133,63 +132,62 @@ export function Sidebar() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         )}
       </AnimatePresence>
 
-      {/* Sidebar panel */}
+      {/* Sidebar panel — tighter, Linear-quality spacing */}
       <motion.aside
         initial={false}
-        animate={{ width: sidebarOpen ? 280 : 0, opacity: sidebarOpen ? 1 : 0 }}
-        transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-        className={`relative flex-shrink-0 overflow-hidden bg-background/70 backdrop-blur-2xl z-50 ${
+        animate={{ width: sidebarOpen ? 260 : 0, opacity: sidebarOpen ? 1 : 0 }}
+        transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+        className={`relative flex-shrink-0 overflow-hidden bg-background/60 backdrop-blur-2xl z-50 ${
           sidebarOpen ? 'md:relative fixed inset-y-0 left-0 md:border-r border-[var(--border-subtle)]' : ''
         }`}
-        style={{ maxWidth: sidebarOpen ? 280 : 0 }}
+        style={{ maxWidth: sidebarOpen ? 260 : 0 }}
       >
-        <div className="flex h-full w-[280px] flex-col">
-          {/* Header with branding */}
-          <div className="flex items-center justify-between px-4 py-3">
-            <img src="/splash-screen.png" alt="Eesha AI" className="h-9 w-auto object-contain" />
+        <div className="flex h-full w-[260px] flex-col">
+          {/* Header with branding — compact */}
+          <div className="flex items-center justify-between px-3 py-2.5">
+            <img src="/splash-screen.png" alt="Eesha AI" className="h-7 w-auto object-contain" />
             <Button
               variant="ghost"
               size="icon"
-              className="size-7 text-muted-foreground hover:text-foreground hover:bg-accent"
+              className="size-6 text-foreground/20 hover:text-foreground/50"
               onClick={() => setSidebarOpen(false)}
             >
-              <PanelLeftClose className="size-4" />
+              <PanelLeftClose className="size-3.5" />
             </Button>
           </div>
 
-          {/* New Chat button — Mint Glass accent */}
-          <div className="px-3 pb-3">
-            <Button
+          {/* New Chat button — subtle, just + and text */}
+          <div className="px-3 pb-2">
+            <button
               onClick={handleNewChat}
-              className="group w-full justify-start gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-gradient-to-r from-violet-600/10 to-emerald-600/10 py-2.5 text-sm text-foreground transition-all duration-200 hover:from-violet-600/20 hover:to-emerald-600/20 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5"
-              variant="ghost"
+              className="group flex w-full items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-transparent px-3 py-2 text-[13px] text-foreground/50 transition-all duration-200 hover:text-foreground/80 hover:border-foreground/10 hover:bg-[var(--surface-secondary)]/50"
             >
-              <Plus className="size-4 transition-transform group-hover:rotate-90 duration-200" />
-              New Chat
-            </Button>
+              <Plus className="size-3.5" />
+              <span>New Chat</span>
+            </button>
           </div>
 
-          {/* Search */}
-          <div className="px-3 pb-3">
+          {/* Search — compact */}
+          <div className="px-3 pb-2">
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[var(--text-tertiary)]" />
+              <Search className="absolute left-2 top-1/2 size-3 -translate-y-1/2 text-foreground/20" />
               <input
                 type="text"
-                placeholder="Search conversations..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] py-2 pl-8 pr-8 text-xs text-foreground placeholder-[var(--text-tertiary)] outline-none transition-all focus:border-primary/30 focus:bg-[var(--surface-tertiary)] focus:shadow-sm focus:shadow-primary/5"
+                className="w-full rounded-md border border-[var(--border-subtle)] bg-transparent py-1.5 pl-7 pr-7 text-[12px] text-foreground placeholder-foreground/20 outline-none transition-all focus:border-foreground/10 focus:bg-[var(--surface-secondary)]/30"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] hover:text-foreground"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground/20 hover:text-foreground/50"
                 >
                   <X className="size-3" />
                 </button>
@@ -197,113 +195,93 @@ export function Sidebar() {
             </div>
           </div>
 
-          {/* Conversation List */}
+          {/* Conversation List — tighter spacing */}
           <ScrollArea className="flex-1 px-2">
-            <div className="py-1">
+            <div className="py-0.5">
               {grouped.map((group) => (
-                <div key={group.label} className="mb-3">
-                  <div className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+                <div key={group.label} className="mb-2">
+                  <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-foreground/20">
                     {group.label}
                   </div>
                   {group.conversations.map((conv) => (
-                    <motion.div
+                    <button
                       key={conv.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.15 }}
+                      onClick={() => setActiveConversation(conv.id)}
+                      className={`group relative flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-all duration-150 ${
+                        activeConversationId === conv.id
+                          ? 'sidebar-item-active text-foreground'
+                          : 'text-foreground/40 hover:text-foreground/70 hover:bg-foreground/[0.03]'
+                      }`}
                     >
-                      <button
-                        onClick={() => setActiveConversation(conv.id)}
-                        className={`group relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-sm transition-all duration-150 ${
-                          activeConversationId === conv.id
-                            ? 'sidebar-item-active text-foreground shadow-sm shadow-primary/5'
-                            : 'text-[var(--text-secondary)] hover:bg-accent hover:text-foreground'
-                        }`}
+                      <MessageSquare className="size-3 shrink-0 opacity-30" />
+                      <span className="flex-1 truncate text-[13px]">{conv.title}</span>
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteTarget(conv);
+                        }}
+                        className="shrink-0 rounded p-0.5 opacity-0 transition-all hover:bg-red-500/10 group-hover:opacity-100"
                       >
-                        <MessageSquare className="size-3.5 shrink-0 opacity-40" />
-                        <span className="flex-1 truncate text-[13px]">{conv.title}</span>
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteTarget(conv);
-                          }}
-                          className="shrink-0 rounded p-0.5 opacity-0 transition-all hover:bg-red-500/10 group-hover:opacity-100"
-                        >
-                          <Trash2 className="size-3 text-muted-foreground hover:text-red-400" />
-                        </span>
-                      </button>
-                    </motion.div>
+                        <Trash2 className="size-2.5 text-foreground/20 hover:text-red-400" />
+                      </span>
+                    </button>
                   ))}
                 </div>
               ))}
               {filteredConversations.length === 0 && (
-                <div className="px-3 py-8 text-center">
-                  <MessageSquare className="mx-auto mb-2 size-8 text-[var(--text-tertiary)]" />
-                  <p className="text-xs text-[var(--text-tertiary)]">
-                    {searchQuery ? 'No matching conversations' : 'Start a new conversation'}
+                <div className="px-3 py-6 text-center">
+                  <p className="text-[11px] text-foreground/20">
+                    {searchQuery ? 'No matching conversations' : 'No conversations yet'}
                   </p>
                 </div>
               )}
             </div>
           </ScrollArea>
 
-          {/* Footer with user info and controls */}
-          <div className="border-t border-[var(--border-subtle)] px-3 py-3">
-            <div className="mb-3">
+          {/* Footer — refined, compact */}
+          <div className="border-t border-[var(--border-subtle)] px-3 py-2.5">
+            <div className="mb-2">
               <ThemeToggle />
             </div>
 
             {session?.user ? (
-              /* ── Authenticated: Username + sign out ── */
-              <div className="flex items-center gap-2.5 rounded-lg bg-white/5 dark:bg-white/5 px-2.5 py-2.5">
-                <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-emerald-600 text-sm font-bold text-white">
-                  {session.user.name?.[0]?.toUpperCase() || <User className="size-4" />}
+              <div className="flex items-center gap-2 rounded-md bg-foreground/[0.03] px-2 py-1.5">
+                <div className="flex size-7 items-center justify-center rounded-full bg-foreground text-[11px] font-semibold text-background">
+                  {session.user.name?.[0]?.toUpperCase() || <User className="size-3.5" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="truncate text-sm font-semibold text-foreground">{session.user.name || 'User'}</p>
-                  <p className="truncate text-[10px] text-[var(--text-tertiary)]">{session.user.email}</p>
+                  <p className="truncate text-[12px] text-foreground/70">{session.user.name || 'User'}</p>
                 </div>
                 <button
                   onClick={handleSignOut}
-                  className="shrink-0 rounded-lg p-1.5 text-[var(--text-secondary)] transition-colors hover:bg-red-500/10 hover:text-red-400"
+                  className="shrink-0 rounded p-1 text-foreground/20 transition-colors hover:text-red-400"
                   title="Sign out"
                 >
-                  <LogOut className="size-4" />
+                  <LogOut className="size-3.5" />
                 </button>
               </div>
             ) : (
-              /* ── Not authenticated: Login & Sign Up ── */
-              <div className="space-y-2">
-                <Button
+              <div className="flex gap-2">
+                <button
                   onClick={() => window.location.href = '/signup'}
-                  className="w-full justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-emerald-600 py-2.5 text-sm font-semibold text-white border-0 hover:from-violet-500 hover:to-emerald-500"
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-foreground py-1.5 text-[12px] font-medium text-background transition-all hover:opacity-90"
                 >
-                  <Sparkles className="size-4" />
                   Sign up
-                </Button>
-                <Button
-                  variant="ghost"
+                </button>
+                <button
                   onClick={() => window.location.href = '/login'}
-                  className="w-full justify-center gap-2 rounded-xl py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent"
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-[var(--border-subtle)] py-1.5 text-[12px] text-foreground/50 transition-all hover:text-foreground/80 hover:border-foreground/10"
                 >
-                  <LogIn className="size-4" />
                   Log in
-                </Button>
+                </button>
               </div>
             )}
 
-            <div className="mt-3 flex items-center gap-2">
-              <button className="flex flex-1 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-accent hover:text-foreground">
-                <Settings className="size-4" />
+            <div className="mt-2 flex items-center gap-1.5">
+              <button className="flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-foreground/25 transition-colors hover:text-foreground/50">
+                <Settings className="size-3.5" />
                 Settings
               </button>
-            </div>
-            <div className="mt-2 flex items-center gap-2 px-2.5">
-              <span className="relative flex size-2">
-                <span className="animate-breathe absolute inline-flex size-full rounded-full bg-emerald-500 opacity-75" />
-                <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-              </span>
-              <span className="text-[11px] text-[var(--text-tertiary)]">Eesha AI via NVIDIA API</span>
             </div>
           </div>
         </div>

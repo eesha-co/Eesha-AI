@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Square, Code2, Sparkles, Globe, Paperclip, Shield } from 'lucide-react';
+import { Send, Square, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useChatStore } from '@/stores/chat-store';
 import { useSession } from 'next-auth/react';
@@ -56,143 +56,129 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
     [handleSubmit]
   );
 
+  const hasContent = input.trim().length > 0;
+
   return (
     <div className="shrink-0 px-4 pb-4 pt-2 relative" style={{ zIndex: 2 }}>
-      <div className="mx-auto max-w-[768px]">
-        {/* Input container — glass morphism with aurora glow */}
-        <motion.div
-          animate={{
-            boxShadow: isFocused
-              ? isStreaming
-                ? '0 0 30px rgba(139, 92, 246, 0.2), 0 0 60px rgba(52, 211, 153, 0.1), 0 0 80px rgba(96, 165, 250, 0.06)'
-                : '0 0 30px rgba(139, 92, 246, 0.15), 0 0 60px rgba(52, 211, 153, 0.08)'
-              : '0 0 0px rgba(139, 92, 246, 0), 0 0 0px rgba(52, 211, 153, 0)',
-          }}
-          transition={{ duration: 0.4, ease: 'easeOut' }}
-          className={`input-glow relative rounded-2xl border transition-all duration-300 ${
-            isStreaming
-              ? 'border-primary/20 dark:border-primary/20 bg-white/20 dark:bg-white/5'
-              : 'border-white/12 dark:border-white/10 bg-white/20 dark:bg-white/5'
-          } backdrop-blur-xl focus-within:border-primary/30 focus-within:bg-white/30 dark:focus-within:bg-white/8`}
-        >
-          {/* Aurora borealis effect when streaming */}
-          {isStreaming && (
-            <div className="absolute inset-0 rounded-2xl animate-aurora opacity-30 pointer-events-none" />
-          )}
-
-          <div className="flex items-end gap-2 p-3">
-            {/* Model indicator — subtle pulse when thinking */}
-            <div className="mb-0.5 flex items-center gap-1.5 shrink-0">
-              <motion.div
-                animate={{
-                  scale: isStreaming ? [1, 1.08, 1] : 1,
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: isStreaming ? Infinity : 0,
-                  ease: 'easeInOut',
-                }}
-                className="relative flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600/30 to-emerald-600/30 border border-white/10 overflow-hidden"
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/15 to-emerald-500/15" />
-                <Code2 className="relative size-3.5 text-primary" />
-              </motion.div>
-            </div>
-
-            {/* Left action buttons */}
-            <div className="flex items-center gap-0.5 mb-0.5 shrink-0">
-              <button className="flex size-6 items-center justify-center rounded-md text-foreground/30 transition-all hover:bg-white/10 hover:text-foreground/70" title="Attach file">
-                <Paperclip className="size-3.5" />
-              </button>
-              <button className="flex size-6 items-center justify-center rounded-md text-foreground/30 transition-all hover:bg-white/10 hover:text-foreground/70" title="Web search">
-                <Globe className="size-3.5" />
-              </button>
-            </div>
-
-            {/* Textarea */}
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              placeholder="Ask Eesha AI to write, debug, or explain code..."
-              rows={1}
-              className="max-h-[200px] min-h-[28px] flex-1 resize-none bg-transparent text-sm leading-relaxed text-foreground placeholder-foreground/30 outline-none"
-            />
-
-            {/* Send / Stop button */}
-            <AnimatePresence mode="wait">
-              {isStreaming ? (
-                <motion.div
-                  key="stop"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.8, opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                >
-                  <Button
-                    onClick={onStop}
-                    className="size-8 shrink-0 rounded-xl bg-red-600/90 text-white shadow-lg shadow-red-500/20 hover:bg-red-600"
-                    size="icon"
-                    title="Stop generating"
-                  >
-                    <Square className="size-3" fill="currentColor" />
-                  </Button>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="send"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.8, opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                >
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={!input.trim()}
-                    className="size-8 shrink-0 rounded-xl bg-gradient-to-r from-violet-600 to-emerald-600 text-white shadow-lg shadow-violet-500/30 transition-all hover:shadow-violet-500/50 disabled:opacity-20 disabled:shadow-none"
-                    size="icon"
-                    title="Send message"
-                  >
-                    <Send className="size-3.5" />
-                  </Button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+      <div className="mx-auto max-w-[720px]">
+        {/* Input container — hero element with gradient border on focus */}
+        <div className={`input-hero relative transition-all duration-300 ${
+          hasContent || isFocused ? 'rounded-2xl' : 'rounded-full'
+        }`}>
+          {/* Animated gradient border */}
+          <div className={`absolute inset-0 rounded-[inherit] transition-opacity duration-500 ${
+            hasContent || isFocused ? 'opacity-100' : 'opacity-0'
+          }`}>
+            <div className="absolute inset-0 rounded-[inherit] animate-gradient-border bg-gradient-to-r from-violet-500/40 via-emerald-500/30 to-violet-500/40 bg-[length:200%_200%]" />
           </div>
-        </motion.div>
 
-        {/* Bottom info */}
+          <div className={`relative rounded-[inherit] border transition-all duration-300 ${
+            hasContent || isFocused
+              ? 'border-white/10 dark:border-white/8 bg-white/15 dark:bg-white/[0.04] backdrop-blur-2xl'
+              : 'border-white/6 dark:border-white/[0.04] bg-white/10 dark:bg-white/[0.03] backdrop-blur-xl'
+          }`}>
+            <div className="flex items-end gap-3 px-4 py-3">
+              {/* Model indicator — tiny dot */}
+              <div className="mb-1 shrink-0 flex items-center gap-2">
+                <motion.div
+                  animate={{
+                    scale: isStreaming ? [1, 1.3, 1] : 1,
+                    opacity: isStreaming ? [0.5, 1, 0.5] : 1,
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: isStreaming ? Infinity : 0,
+                    ease: 'easeInOut',
+                  }}
+                  className="size-2 rounded-full bg-gradient-to-br from-violet-500 to-emerald-500"
+                />
+              </div>
+
+              {/* Textarea */}
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                placeholder="What do you want to build?"
+                rows={1}
+                className="max-h-[200px] min-h-[24px] flex-1 resize-none bg-transparent text-[15px] leading-relaxed text-foreground placeholder-foreground/25 outline-none"
+              />
+
+              {/* Send / Stop button — elegant minimal style */}
+              <AnimatePresence mode="wait">
+                {isStreaming ? (
+                  <motion.div
+                    key="stop"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="shrink-0 mb-0.5"
+                  >
+                    <button
+                      onClick={onStop}
+                      className="flex size-8 items-center justify-center rounded-lg bg-foreground/10 text-foreground/70 transition-all hover:bg-foreground/15 hover:text-foreground"
+                      title="Stop generating"
+                    >
+                      <Square className="size-3" fill="currentColor" />
+                    </button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="send"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="shrink-0 mb-0.5"
+                  >
+                    <button
+                      onClick={handleSubmit}
+                      disabled={!hasContent}
+                      className={`flex size-8 items-center justify-center rounded-lg transition-all duration-200 ${
+                        hasContent
+                          ? 'bg-foreground text-background hover:opacity-90'
+                          : 'bg-foreground/8 text-foreground/20 cursor-default'
+                      }`}
+                      title="Send message"
+                    >
+                      <Send className="size-3.5" />
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom info — barely visible */}
         <div className="mt-2 flex items-center justify-between px-1">
           <div className="flex items-center gap-1.5">
-            <Shield className="size-3 text-primary/40" />
-            <span className="text-[11px] text-foreground/25">Eesha AI — 3 Agents, 1 Answer</span>
-          </div>
-          <div className="flex items-center gap-3">
             {!isAuthenticated && creditsRemaining <= 2 && creditsRemaining > 0 && (
               <button
                 onClick={() => router.push('/signup')}
-                className="flex items-center gap-1 text-[11px] text-amber-400/70 hover:text-amber-400 transition-colors"
+                className="flex items-center gap-1 text-[11px] text-foreground/20 hover:text-foreground/40 transition-colors"
               >
                 <Sparkles className="size-3" />
-                {creditsRemaining} free message{creditsRemaining !== 1 ? 's' : ''} left — Sign up
+                {creditsRemaining} free message{creditsRemaining !== 1 ? 's' : ''} left
               </button>
             )}
             {!isAuthenticated && creditsRemaining === 0 && (
               <button
                 onClick={() => router.push('/signup')}
-                className="flex items-center gap-1 text-[11px] text-violet-400/80 hover:text-violet-400 transition-colors"
+                className="flex items-center gap-1 text-[11px] text-foreground/20 hover:text-foreground/40 transition-colors"
               >
                 <Sparkles className="size-3" />
-                Sign up for unlimited access
+                Sign up for unlimited
               </button>
             )}
-            <span className="text-[11px] text-foreground/25">
-              AI can make mistakes. Review code carefully.
-            </span>
           </div>
+          <span className="text-[11px] text-foreground/15">
+            AI can make mistakes. Review code carefully.
+          </span>
         </div>
       </div>
     </div>

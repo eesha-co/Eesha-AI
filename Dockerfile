@@ -51,10 +51,13 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-# Copy pg module for DB migration
+# Copy pg module for DB migration and email template updates
 COPY --from=builder /app/node_modules/pg ./node_modules/pg
+COPY --from=builder /app/node_modules/pg-connection-string ./node_modules/pg-connection-string 2>/dev/null || true
 # Copy prisma CLI for runtime schema sync (prisma db push)
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+# Copy email template update script
+COPY --from=builder /app/scripts ./scripts
 
 # Set environment variables for runtime
 # NOTE: The following MUST be set as HF Spaces Secrets:
@@ -81,6 +84,10 @@ echo "Auth: NextAuth.js"
 # Sync Prisma schema to database (adds new columns like passwordHash)
 echo "Syncing database schema..."
 npx prisma db push --skip-generate 2>/dev/null || echo "Warning: DB schema sync failed (non-fatal)"
+
+# Update Supabase email templates to use OTP codes instead of links
+echo "Updating email templates..."
+node scripts/update-email-templates.js 2>/dev/null || echo "Warning: Email template update failed (non-fatal)"
 
 node server.js
 SQLEOF

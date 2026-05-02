@@ -29,7 +29,7 @@ function checkOtpRateLimit(identifier: string): { allowed: boolean; retryAfter?:
 // Supabase OTP verification with fallback:
 //   1. Try verifyOtp({ type: 'signup' }) — for tokens from signUp()
 //   2. If that fails, try verifyOtp({ type: 'email' }) — for tokens from signInWithOtp()
-//   3. If success → mark email verified in DB + ensure password is saved
+//   3. If success → mark email verified in DB + ensure password & bcrypt hash are saved
 //
 // We try 'signup' first because our signup route now uses signUp() which
 // generates signup-type tokens. We fall back to 'email' for backward
@@ -141,41 +141,58 @@ export async function POST(request: NextRequest) {
       const userId = data.user.id;
 
       // ── Ensure password is set in Supabase Auth ──────────────────────────
-      // Critical: signUp() should save the password, but we double-check here.
-      if (password && typeof password === 'string') {
+      // signUp() should save the password, but we explicitly set it here
+      // as a safeguard. This uses the admin API because the user's session
+      // from verifyOtp may not have permission to update their own password.
+      if (password && typeof password === 'string' && password.length >= 8) {
         try {
           const adminClient = createServerSupabaseClient();
           await adminClient.auth.admin.updateUserById(userId, { password });
           console.log('[VERIFY-OTP] Password ensured in Supabase Auth for:', normalizedEmail);
         } catch (pwErr) {
           console.error('[VERIFY-OTP] Could not save password to Supabase Auth:', pwErr);
-          // Non-fatal — the user is still verified
+          // Non-fatal — the user is still verified, signUp() should have the password
         }
       }
 
-      // ── Update Prisma DB (upsert — works even if record doesn't exist) ────
+      // ── Update Prisma DB ──────────────────────────────────────────────────
+      // Always upsert by email (not by id) to avoid duplicate records.
+      // The signup route creates by email, so we match on email here too.
       try {
         const { db } = await import('@/lib/db');
-        const updateData: any = { emailVerified: new Date() };
+        const updateData: Record<string, any> = {
+          emailVerified: new Date(),
+        };
 
-        // Also save bcrypt hash as a backup for the fallback in auth.ts
-        if (password && typeof password === 'string') {
+        // Save bcrypt hash as backup for the local fallback in auth.ts
+        if (password && typeof password === 'string' && password.length >= 8) {
           updateData.passwordHash = await bcrypt.hash(password, 12);
         }
 
-        // Use upsert — the DB record might not exist if signup's upsert failed
-        await db.user.upsert({
-          where: { id: userId },
-          create: {
-            id: userId,
-            email: normalizedEmail,
-            name: data.user.user_metadata?.username || normalizedEmail.split('@')[0],
-            emailVerified: new Date(),
-            passwordHash: updateData.passwordHash,
-          },
-          update: updateData,
-        });
-        console.log('[VERIFY-OTP] DB record updated for:', normalizedEmail);
+        // Upsert by email — matches what the signup route does
+        // This avoids creating duplicates if the ID format differs
+        const existingUser = await db.user.findUnique({ where: { email: normalizedEmail } });
+
+        if (existingUser) {
+          // Update existing record — keep the existing ID, just update fields
+          await db.user.update({
+            where: { id: existingUser.id },
+            data: updateData,
+          });
+          console.log('[VERIFY-OTP] DB record updated for:', normalizedEmail);
+        } else {
+          // Create new record — use Supabase Auth user ID
+          await db.user.create({
+            data: {
+              id: userId,
+              email: normalizedEmail,
+              name: data.user.user_metadata?.username || normalizedEmail.split('@')[0],
+              emailVerified: new Date(),
+              passwordHash: updateData.passwordHash || null,
+            },
+          });
+          console.log('[VERIFY-OTP] DB record created for:', normalizedEmail);
+        }
       } catch (dbError) {
         console.error('[VERIFY-OTP] DB update error (non-fatal):', dbError);
       }

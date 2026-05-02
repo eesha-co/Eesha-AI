@@ -6,7 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Github, Mail, Shield, Infinity, MessageSquare,
   Code2, Terminal, Eye, EyeOff, Lock, ArrowRight, Check,
-  AlertCircle, RefreshCw, KeyRound, Zap, Cpu, Brain
+  AlertCircle, RefreshCw, KeyRound, Zap, Cpu, Brain,
+  ExternalLink
 } from 'lucide-react';
 import { SmokyBackground } from '@/components/chat/smoky-background';
 
@@ -121,6 +122,7 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [hasResent, setHasResent] = useState(false);
 
   useEffect(() => {
     getProviders().then((p) => {
@@ -212,12 +214,11 @@ export default function SignupPage() {
             body: JSON.stringify({ email }),
           });
           if (otpRes.ok) {
-            // OTP resent successfully — go to verify step
             setStep('verify');
             setResendCooldown(60);
+            setHasResent(true);
             return;
           }
-          // If resend fails, still show the error
         }
         setError(data.error || 'Sign-up failed. Please try again.');
         return;
@@ -260,9 +261,39 @@ export default function SignupPage() {
         return;
       }
 
+      // Handle already-verified case (user clicked link)
+      if (data.alreadyVerified) {
+        setStep('success');
+        return;
+      }
+
       setStep('success');
     } catch {
       setError('Network error. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ── Check if already verified (for link-click case) ─────────────────────
+  const handleCheckVerification = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/auth/check-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+
+      if (data.status === 'verified') {
+        setStep('success');
+        return;
+      }
+
+      setError('Your email is not verified yet. Please enter the code or click the link in your email.');
+    } catch {
+      setError('Could not check verification status. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -280,10 +311,17 @@ export default function SignupPage() {
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
+
+      if (data.alreadyVerified) {
+        setStep('success');
+        return;
+      }
+
       if (!res.ok) {
         setError(data.error || 'Could not resend code.');
       } else {
         setResendCooldown(60);
+        setHasResent(true);
         setError('');
         setOtp('');
       }
@@ -431,9 +469,9 @@ export default function SignupPage() {
             <motion.div
               initial={{ opacity: 0, y: -5 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-5 flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3"
+              className="mb-5 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3"
             >
-              <AlertCircle className="size-4 shrink-0 text-red-500 dark:text-red-400" />
+              <AlertCircle className="size-4 shrink-0 mt-0.5 text-red-500 dark:text-red-400" />
               <span className="text-sm text-red-700 dark:text-red-300">{error}</span>
             </motion.div>
           )}
@@ -709,7 +747,7 @@ export default function SignupPage() {
                     ) : (
                       <>
                         <Shield className="size-4" />
-                        Create Account & Send Code
+                        Create Account
                       </>
                     )}
                   </button>
@@ -733,9 +771,12 @@ export default function SignupPage() {
                   </div>
                 </div>
 
-                <div className="text-center">
+                <div className="text-center space-y-1">
                   <p className="text-sm text-muted-foreground">
                     Check your email for a 6-digit verification code
+                  </p>
+                  <p className="text-xs text-muted-foreground/70">
+                    If your email contains a verification link instead, click it to verify
                   </p>
                 </div>
 
@@ -756,7 +797,7 @@ export default function SignupPage() {
                   )}
                 </button>
 
-                <div className="text-center">
+                <div className="text-center space-y-2">
                   {resendCooldown > 0 ? (
                     <p className="text-xs text-muted-foreground">
                       Resend code in <span className="text-primary">{resendCooldown}s</span>
@@ -770,12 +811,29 @@ export default function SignupPage() {
                       Didn&apos;t get a code? Resend
                     </button>
                   )}
+
+                  <button
+                    onClick={handleCheckVerification}
+                    disabled={isLoading}
+                    className="block mx-auto text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Already clicked the link? Check status
+                  </button>
                 </div>
+
+                {hasResent && (
+                  <div className="flex items-center gap-2 rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3">
+                    <AlertCircle className="size-4 shrink-0 text-blue-500 dark:text-blue-400" />
+                    <span className="text-xs text-blue-700 dark:text-blue-200">
+                      A new code has been sent. Use the code from the LATEST email — previous codes are no longer valid.
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
                   <AlertCircle className="size-4 shrink-0 text-amber-500 dark:text-amber-400" />
                   <span className="text-xs text-amber-700 dark:text-amber-200">
-                    Your account is locked until you verify your email. This protects your data from unauthorized access. If your code has expired, click Resend to get a new one.
+                    Your account is locked until you verify your email. This protects your data from unauthorized access.
                   </span>
                 </div>
               </motion.div>

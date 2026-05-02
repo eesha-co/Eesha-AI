@@ -4,6 +4,12 @@ import { getToken } from "next-auth/jwt";
 import { createHmac } from "crypto";
 import { rateLimiter } from "@/lib/rate-limiter";
 
+// SECURITY: This middleware requires the Node.js runtime because it uses:
+// - Node.js 'crypto' module for HMAC cookie signing and anonymous ID generation
+// - In-memory Map for rate limiting (with periodic cleanup via setInterval)
+// The Edge Runtime does not support these Node.js APIs.
+export const runtime = 'nodejs';
+
 // ─── Rate Limiting Configuration ─────────────────────────────────────────────
 // Uses the RateLimiter abstraction from @/lib/rate-limiter.
 // Currently in-memory (single-instance). Set REDIS_URL to enable Redis store

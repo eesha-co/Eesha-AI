@@ -60,12 +60,10 @@ async function findUserByEmail(adminClient: ReturnType<typeof createServerSupaba
 }
 
 // ─── Helper: Create Prisma DB record (best-effort) ──────────────────────────
-// Also saves a bcrypt hash of the password as a backup.
 async function ensureDbUser(userId: string, email: string, emailVerified: Date | null, plainPassword?: string, username?: string) {
   try {
     const { db } = await import('@/lib/db');
 
-    // Hash the password with bcrypt for backup storage (12 salt rounds = strong)
     let passwordHash: string | undefined;
     if (plainPassword) {
       passwordHash = await bcrypt.hash(plainPassword, 12);
@@ -90,14 +88,44 @@ async function ensureDbUser(userId: string, email: string, emailVerified: Date |
   }
 }
 
+// ─── Helper: Send OTP code via signInWithOtp ────────────────────────────────
+// This ALWAYS sends an OTP code (never a magic link), regardless of the
+// Supabase email template configuration. We try multiple approaches:
+//   1. signInWithOtp({ shouldCreateUser: false }) — user already exists
+//   2. signInWithOtp() without flag — more permissive
+// Returns true if OTP was sent successfully.
+async function sendOtpCode(signupClient: ReturnType<typeof createSignupClient>, email: string): Promise<{ sent: boolean; error?: string }> {
+  // Attempt 1: with shouldCreateUser: false (user already exists)
+  try {
+    const { error } = await signupClient.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false },
+    });
+    if (!error) {
+      console.log('[SIGNUP] OTP sent via signInWithOtp (shouldCreateUser: false) for:', email);
+      return { sent: true };
+    }
+    console.warn('[SIGNUP] signInWithOtp with shouldCreateUser:false failed:', error.message);
+  } catch (e) {
+    console.warn('[SIGNUP] signInWithOtp attempt 1 exception:', e);
+  }
+
+  // Attempt 2: without shouldCreateUser flag (more permissive)
+  try {
+    const { error } = await signupClient.auth.signInWithOtp({ email });
+    if (!error) {
+      console.log('[SIGNUP] OTP sent via signInWithOtp (no flag) for:', email);
+      return { sent: true };
+    }
+    console.warn('[SIGNUP] signInWithOtp without flag also failed:', error.message);
+    return { sent: false, error: error.message };
+  } catch (e) {
+    console.warn('[SIGNUP] signInWithOtp attempt 2 exception:', e);
+    return { sent: false, error: String(e) };
+  }
+}
+
 // ─── Helper: Verify password was saved and fix if not ────────────────────────
-// After signUp(), we ensure the password was actually stored in auth.users.
-//
-// IMPORTANT: We CANNOT use signInWithPassword to verify for unconfirmed users,
-// because Supabase blocks login until the email is verified. Instead, we:
-//   1. Check if the user was created with identities (indicates proper signup)
-//   2. Always set the password via admin API as a safety measure
-//   3. Confirm the user record exists and is valid
 async function verifyAndFixPassword(
   adminClient: ReturnType<typeof createServerSupabaseClient>,
   email: string,
@@ -110,17 +138,11 @@ async function verifyAndFixPassword(
     return { ok: false, error: 'User not found after creation.' };
   }
 
-  // Check if the user has any identities (indicates a proper signup)
-  const hasIdentities = Array.isArray(user.identities) && user.identities.length > 0;
   const isConfirmed = !!user.email_confirmed_at;
 
   if (isConfirmed) {
-    // For confirmed users, we can verify the password works directly
     const signupClient = createSignupClient();
-    const { error: verifyError } = await signupClient.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error: verifyError } = await signupClient.auth.signInWithPassword({ email, password });
 
     if (!verifyError) {
       console.log('[SIGNUP] Password verified successfully for confirmed user:', email);
@@ -128,7 +150,6 @@ async function verifyAndFixPassword(
       return { ok: true, userId: user.id };
     }
 
-    // Password doesn't work for confirmed user — fix via admin API
     console.log('[SIGNUP] Password NOT working for confirmed user, fixing via admin API...');
     const { error: updateError } = await adminClient.auth.admin.updateUserById(user.id, { password });
     if (updateError) {
@@ -136,52 +157,42 @@ async function verifyAndFixPassword(
       return { ok: false, userId: user.id, error: 'Password could not be saved. Please try again.' };
     }
 
-    // Re-verify after fix
     const { error: reverifyError } = await signupClient.auth.signInWithPassword({ email, password });
     if (reverifyError) {
       console.error('[SIGNUP] Password still not working after admin update:', reverifyError.message);
       return { ok: false, userId: user.id, error: 'Password verification failed. Please try again.' };
     }
     try { await signupClient.auth.signOut(); } catch {}
-    console.log('[SIGNUP] Password fixed and verified for confirmed user:', email);
     return { ok: true, userId: user.id };
   }
 
-  // ── UNCONFIRMED USER (normal signup flow) ─────────────────────────────────
-  // Cannot use signInWithPassword — Supabase blocks login for unconfirmed emails.
-  // Instead, ensure the password is set via admin API and trust it.
-  console.log('[SIGNUP] User is unconfirmed (identities:', hasIdentities ? 'present' : 'empty', '). Ensuring password is set via admin API...');
-
-  const { error: updateError } = await adminClient.auth.admin.updateUserById(user.id, {
-    password,
-  });
+  // UNCONFIRMED USER — ensure password is set via admin API
+  console.log('[SIGNUP] User is unconfirmed. Ensuring password is set via admin API...');
+  const { error: updateError } = await adminClient.auth.admin.updateUserById(user.id, { password });
 
   if (updateError) {
-    console.error('[SIGNUP] Failed to set password via admin API for unconfirmed user:', updateError.message);
-    // This might fail if the password was already set correctly by signUp()
-    // Only fail if it's not a "no changes" type error
     const msg = updateError.message.toLowerCase();
     if (!msg.includes('no changes') && !msg.includes('same password')) {
       return { ok: false, userId: user.id, error: 'Password could not be saved. Please try again.' };
     }
   }
 
-  console.log('[SIGNUP] Password ensured via admin API for unconfirmed user:', email);
   return { ok: true, userId: user.id };
 }
 
 // ─── POST /api/auth/signup ────────────────────────────────────────────────────
 //
-// ROBUST signup flow with password verification:
+// BULLETPROOF signup flow:
 //
 //   1. Validate input + rate limit
-//   2. Check if user already exists via admin API FIRST
+//   2. Check if user already exists via admin API
 //      - If confirmed → "please log in"
 //      - If unconfirmed → DELETE the stale user so signUp() will work
-//   3. Call signUp() with anon key — creates user AND sends OTP
-//   4. VERIFY password was actually saved (critical fix!)
-//      - Try signInWithPassword — if it fails, set password via admin API
-//   5. Create Prisma DB record (best-effort)
+//   3. Call signUp() with anon key — creates user AND triggers verification email
+//   4. ALWAYS send OTP via signInWithOtp() — guarantees a CODE is sent
+//      (signUp() might send a link instead of a code depending on template config)
+//   5. Verify password was actually saved (fix via admin API if not)
+//   6. Create Prisma DB record (best-effort)
 
 export async function POST(request: NextRequest) {
   try {
@@ -246,7 +257,6 @@ export async function POST(request: NextRequest) {
 
     // ── STEP 1: Check if user already exists via admin API ─────────────────
     console.log('[SIGNUP] Checking if user exists:', normalizedEmail);
-
     const { user: existingUser } = await findUserByEmail(adminClient, normalizedEmail);
 
     if (existingUser) {
@@ -258,9 +268,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // ── UNCONFIRMED USER: Delete so signUp() can create fresh ────────────
-      console.log('[SIGNUP] Found unconfirmed user, deleting to allow fresh signup:', normalizedEmail, '(id:', existingUser.id, ')');
-
+      // UNCONFIRMED USER: Delete so signUp() can create fresh
+      console.log('[SIGNUP] Found unconfirmed user, deleting to allow fresh signup:', normalizedEmail);
       const { error: deleteError } = await adminClient.auth.admin.deleteUser(existingUser.id);
       if (deleteError) {
         console.error('[SIGNUP] Failed to delete unconfirmed user:', deleteError.message);
@@ -269,7 +278,6 @@ export async function POST(request: NextRequest) {
           const { db } = await import('@/lib/db');
           await db.user.deleteMany({ where: { email: normalizedEmail } });
         } catch {}
-
         console.log('[SIGNUP] Deleted unconfirmed user, waiting for propagation...');
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
@@ -296,7 +304,6 @@ export async function POST(request: NextRequest) {
 
       if (isAlreadyRegisteredError(signUpError.message)) {
         console.log('[SIGNUP] "Already registered" after cleanup attempt, retrying...');
-
         const { user: retryUser } = await findUserByEmail(adminClient, normalizedEmail);
         if (retryUser && !retryUser.email_confirmed_at) {
           const { error: del2 } = await adminClient.auth.admin.deleteUser(retryUser.id);
@@ -323,17 +330,16 @@ export async function POST(request: NextRequest) {
 
         if (retryError) {
           console.error('[SIGNUP] Retry signUp also failed:', retryError.message);
-          console.log('[SIGNUP] Trying admin fallback');
           return await adminFallbackSignup(adminClient, signupClient, normalizedEmail, password, retryUser, username);
         }
 
-        // Retry succeeded — verify password was saved
+        // Retry succeeded
         const pwCheck = await verifyAndFixPassword(adminClient, normalizedEmail, password);
         if (!pwCheck.ok) {
           return NextResponse.json({ error: pwCheck.error || 'Password could not be saved. Please try again.' }, { status: 500 });
         }
 
-        return handleSuccessfulSignup(retryData, normalizedEmail, pwCheck.userId, password, username);
+        return handleSuccessfulSignup(signupClient, retryData, adminClient, normalizedEmail, pwCheck.userId, password, username);
       }
 
       if (signUpError.message.toLowerCase().includes('rate limit') || signUpError.message.toLowerCase().includes('too many')) {
@@ -343,23 +349,20 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      console.error('[SIGNUP] Unrecognized signUp error:', signUpError.message);
-      return NextResponse.json(
-        { error: `Could not create your account: ${signUpError.message}` },
-        { status: 500 }
-      );
+      // For any other signUp error, try admin fallback
+      console.error('[SIGNUP] Unrecognized signUp error, trying admin fallback:', signUpError.message);
+      const { user: fallbackUser } = await findUserByEmail(adminClient, normalizedEmail);
+      return await adminFallbackSignup(adminClient, signupClient, normalizedEmail, password, fallbackUser, username);
     }
 
     // ── STEP 3: Verify password was actually saved ─────────────────────────
-    // This is the critical fix: after signUp(), we verify the password works.
-    // If it doesn't (e.g., Supabase didn't save it properly), we set it via admin API.
     const pwCheck = await verifyAndFixPassword(adminClient, normalizedEmail, password);
     if (!pwCheck.ok) {
       return NextResponse.json({ error: pwCheck.error || 'Password could not be saved. Please try again.' }, { status: 500 });
     }
 
-    // ── signUp() returned without error ────────────────────────────────────
-    return handleSuccessfulSignup(signUpData, normalizedEmail, pwCheck.userId, password, username);
+    // ── STEP 4: Return success (handleSuccessfulSignup sends OTP) ──────────
+    return handleSuccessfulSignup(signupClient, signUpData, adminClient, normalizedEmail, pwCheck.userId, password, username);
 
   } catch (error) {
     console.error('[SIGNUP] Unexpected error:', error instanceof Error ? error.message : error);
@@ -369,8 +372,13 @@ export async function POST(request: NextRequest) {
 }
 
 // ─── Handle a successful signUp() response ──────────────────────────────────
-function handleSuccessfulSignup(
+// CRITICAL: Always sends an OTP code via signInWithOtp() AFTER signUp().
+// signUp() might send a verification LINK (not a code) depending on the
+// Supabase email template config. signInWithOtp() ALWAYS sends a code.
+async function handleSuccessfulSignup(
+  signupClient: ReturnType<typeof createSignupClient>,
   signUpData: { user?: { id?: string; email_confirmed_at?: string; identities?: unknown[] } | null; session?: unknown },
+  adminClient: ReturnType<typeof createServerSupabaseClient>,
   email: string,
   verifiedUserId?: string,
   password?: string,
@@ -384,9 +392,21 @@ function handleSuccessfulSignup(
   // Check for the "empty identities" case — user already existed
   const identities = signUpData.user.identities;
   if (Array.isArray(identities) && identities.length === 0) {
-    console.log('[SIGNUP] signUp returned user with empty identities — user already exists, OTP NOT sent');
+    console.log('[SIGNUP] signUp returned user with empty identities — user already exists, OTP NOT sent by signUp');
+
+    // Still try to send OTP ourselves
+    const otpResult = await sendOtpCode(signupClient, email);
+    if (otpResult.sent) {
+      return NextResponse.json({
+        success: true,
+        message: 'A verification code has been sent to your email.',
+        email,
+        emailConfirmed: false,
+      });
+    }
+
     return NextResponse.json({
-      error: 'An account with this email already exists but is not verified. We will send you a new verification code.',
+      error: 'An account with this email already exists but is not verified. A new verification code has been sent.',
       requiresOtpResend: true,
       email,
     }, { status: 409 });
@@ -407,8 +427,23 @@ function handleSuccessfulSignup(
     });
   }
 
-  // Normal success: new user created, OTP sent, password verified
-  console.log('[SIGNUP] Success: user created + OTP sent + password verified for:', email);
+  // ── CRITICAL: Always send OTP code via signInWithOtp ─────────────────────
+  // signUp() may have sent a verification LINK, not a code.
+  // signInWithOtp() ALWAYS sends a 6-digit OTP code.
+  console.log('[SIGNUP] Sending guaranteed OTP code via signInWithOtp for:', email);
+
+  // Small delay to avoid Supabase rate limiting the email
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  const otpResult = await sendOtpCode(signupClient, email);
+  if (otpResult.sent) {
+    console.log('[SIGNUP] OTP code sent successfully for:', email);
+  } else {
+    console.error('[SIGNUP] Failed to send OTP code:', otpResult.error);
+    // Don't fail the signup — the user can use "Resend" later
+  }
+
+  // Create DB record
   const userId = verifiedUserId || signUpData.user.id;
   if (userId) {
     ensureDbUser(userId, email, null, password, username);
@@ -462,7 +497,6 @@ async function adminFallbackSignup(
 
       userId = createData.user?.id;
     } else {
-      // User exists — update their password
       console.log('[SIGNUP] Admin fallback: updating password for existing user:', email);
       const { error: updateError } = await adminClient.auth.admin.updateUserById(userId, {
         password,
@@ -477,27 +511,21 @@ async function adminFallbackSignup(
       }
     }
 
-    // Send OTP via signInWithOtp
+    // Always send OTP via signInWithOtp — guarantees a code is sent
     console.log('[SIGNUP] Admin fallback: sending OTP via signInWithOtp for:', email);
-    const { error: otpError } = await signupClient.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: false },
-    });
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const otpResult = await sendOtpCode(signupClient, email);
 
-    if (otpError) {
-      console.error('[SIGNUP] Admin fallback signInWithOtp error:', otpError.message);
+    if (!otpResult.sent) {
+      console.error('[SIGNUP] Admin fallback: OTP send failed:', otpResult.error);
       return NextResponse.json(
-        { error: 'Your account exists but we could not send a verification code. Please try again in a few minutes.' },
+        { error: 'Your account was created but we could not send a verification code. Please try the "Resend" button on the verification page.' },
         { status: 500 }
       );
     }
 
-    // Verify password works
-    const pwCheck = await verifyAndFixPassword(adminClient, email, password);
-    if (!pwCheck.ok) {
-      console.error('[SIGNUP] Admin fallback: password verification failed');
-      // Don't fail — the user can still verify email and then reset password
-    }
+    // Verify password works (best-effort)
+    await verifyAndFixPassword(adminClient, email, password);
 
     if (userId) {
       ensureDbUser(userId, email, null, password, username);

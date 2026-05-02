@@ -58,23 +58,36 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
-        try {
-          const statusRes = await fetch('/api/auth/check-status', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email }),
-          });
-          const statusData = await statusRes.json();
+        // NextAuth maps thrown Errors to the error string.
+        // Our authorize() throws: EMAIL_NOT_VERIFIED, NO_ACCOUNT, INVALID_PASSWORD
+        const errType = result.error;
 
-          if (statusData.status === 'unverified') {
-            setError('Your email has not been verified yet. Please check your email for a verification code, or sign up again to get a new one.');
-          } else if (statusData.status === 'not_found') {
-            setError('No account found with this email. Please sign up first.');
-          } else {
+        if (errType === 'EMAIL_NOT_VERIFIED') {
+          setError('Your email has not been verified yet. Please check your email for a verification code, or sign up again to resend it.');
+        } else if (errType === 'NO_ACCOUNT') {
+          setError('No account found with this email. Please sign up first.');
+        } else if (errType === 'INVALID_PASSWORD') {
+          setError('Incorrect password. Please try again or reset your password.');
+        } else {
+          // Fallback: check status via API for any other error
+          try {
+            const statusRes = await fetch('/api/auth/check-status', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email }),
+            });
+            const statusData = await statusRes.json();
+
+            if (statusData.status === 'unverified') {
+              setError('Your email has not been verified yet. Please check your email for a verification code, or sign up again to resend it.');
+            } else if (statusData.status === 'not_found') {
+              setError('No account found with this email. Please sign up first.');
+            } else {
+              setError('Invalid email or password. Please try again.');
+            }
+          } catch {
             setError('Invalid email or password. Please try again.');
           }
-        } catch {
-          setError('Invalid email or password. Please try again.');
         }
       } else if (result?.ok) {
         window.location.href = '/';

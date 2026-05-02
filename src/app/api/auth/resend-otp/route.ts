@@ -11,12 +11,12 @@ const lastResendTime = new Map<string, number>();
 
 // ─── POST /api/auth/resend-otp ────────────────────────────────────────────────
 //
-// Simple Supabase OTP resend:
+// Resend verification email using Supabase resend() method:
 //   1. Verify user exists and isn't already confirmed
-//   2. Call signInWithOtp({ shouldCreateUser: false }) — sends a new 6-digit code
+//   2. Call resend({ type: 'signup' }) — resends the verification email
 //   3. Done
 //
-// The new code replaces the old one. User must use the NEW code.
+// This uses the standard Supabase resend() method which works with signUp().
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,7 +54,14 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Verify the user exists before sending ───────────────────────────────
-    const adminClient = createServerSupabaseClient();
+    let adminClient;
+    try {
+      adminClient = createServerSupabaseClient();
+    } catch (envError) {
+      console.error('[RESEND-OTP] Missing Supabase env vars:', envError);
+      return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });
+    }
+
     const { data: usersData } = await adminClient.auth.admin.listUsers();
     const user = usersData?.users?.find(u => u.email?.toLowerCase() === emailKey);
 
@@ -74,31 +81,55 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // ── Send new OTP via signInWithOtp ──────────────────────────────────────
-    // This replaces any existing code. The user must use the NEW code.
-    const anonClient = createSignupClient();
+    // ── Resend verification email ──────────────────────────────────────────
+    // Use resend() with type 'signup' — this is the standard way to resend
+    // verification emails for signUp()-created users.
+    let anonClient;
+    try {
+      anonClient = createSignupClient();
+    } catch (envError) {
+      console.error('[RESEND-OTP] Missing SUPABASE_ANON_KEY:', envError);
+      return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });
+    }
 
-    const { error: otpError } = await anonClient.auth.signInWithOtp({
+    // Try type 'signup' first (for signUp-created users), then 'emailchange' or 'magiclink'
+    console.log('[RESEND-OTP] Resending with type=signup for:', emailKey);
+    const { error: resendError } = await anonClient.auth.resend({
+      type: 'signup',
       email: emailKey,
-      options: {
-        shouldCreateUser: false,
-      },
     });
 
-    if (otpError) {
-      console.error('[RESEND-OTP] signInWithOtp failed:', otpError.message);
-      return NextResponse.json(
-        { error: 'Unable to send verification code. Please wait a minute and try again.' },
-        { status: 500 }
-      );
+    if (resendError) {
+      console.error('[RESEND-OTP] resend(signup) failed:', resendError.message);
+
+      // Fallback: try signInWithOtp as a last resort
+      // This handles cases where the user was created with the old admin.createUser + signInWithOtp flow
+      console.log('[RESEND-OTP] Falling back to signInWithOtp for:', emailKey);
+      const { error: otpError } = await anonClient.auth.signInWithOtp({
+        email: emailKey,
+        options: {
+          shouldCreateUser: false,
+        },
+      });
+
+      if (otpError) {
+        console.error('[RESEND-OTP] signInWithOtp fallback also failed:', otpError.message);
+        return NextResponse.json(
+          { error: 'Unable to send verification code. Please wait a minute and try again.' },
+          { status: 500 }
+        );
+      }
+
+      console.log('[RESEND-OTP] OTP sent via signInWithOtp fallback to:', emailKey);
+    } else {
+      console.log('[RESEND-OTP] Verification email resent to:', emailKey);
     }
 
     lastResendTime.set(emailKey, now);
-    console.log('[RESEND-OTP] New OTP sent to:', emailKey);
 
     return NextResponse.json({
       success: true,
-      message: 'A new verification code has been sent to your email. Use the new code — the old one is no longer valid.',
+      message: 'A new verification code has been sent to your email.',
     });
 
   } catch (error) {

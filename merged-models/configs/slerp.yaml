@@ -1,0 +1,32 @@
+# ============================================================
+# PRACTICAL MERGE: SLERP with Layer-wise Control
+# ============================================================
+# SLERP smoothly interpolates between two models.
+# We use per-filter parameters to control which layers
+# lean toward which expert.
+#
+# The Spine (Qwen2.5-0.5B base) is blended with:
+#   - The Wit (Qwen2.5-0.5B-Instruct) for top/MLP layers
+#   - Then we do a second pass for empathy
+# ============================================================
+
+slices:
+  - sources:
+      - model: Qwen/Qwen2.5-0.5B
+        layer_range: [0, 24]
+      - model: Qwen/Qwen2.5-0.5B-Instruct
+        layer_range: [0, 24]
+    parameters:
+      t:
+        # Attention layers: slight lean toward base (preserve intelligence)
+        - filter: self_attn
+          value: [0, 0.2, 0.3, 0.2, 0.1]
+        # MLP layers: lean toward Instruct (activate wit/banter)
+        - filter: mlp
+          value: [1, 0.7, 0.5, 0.3, 0.0]
+        # Default: 30% Instruct, 70% base
+        - value: 0.3
+
+merge_method: slerp
+base_model: Qwen/Qwen2.5-0.5B
+dtype: bfloat16

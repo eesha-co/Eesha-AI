@@ -1,0 +1,30 @@
+# ============================================================
+# PRACTICAL MERGE: Passthrough (Frankenstein Layer Stacking)
+# ============================================================
+# This approach stacks layers from different models to create
+# a deeper, multi-personality model.
+#
+# Bottom layers: Base model (foundation intelligence)
+# Top layers: Instruct model (wit & banter personality)
+#
+# This creates a model with MORE layers than either parent.
+# ============================================================
+
+slices:
+  # Bottom layers: Base model (The Spine - raw intelligence)
+  - sources:
+      - model: Qwen/Qwen2.5-0.5B
+        layer_range: [0, 12]
+
+  # Middle layers: Instruct model (The Wit - personality transition)
+  - sources:
+      - model: Qwen/Qwen2.5-0.5B-Instruct
+        layer_range: [12, 20]
+
+  # Top layers: Instruct model (The Wit - snappy personality at the top)
+  - sources:
+      - model: Qwen/Qwen2.5-0.5B-Instruct
+        layer_range: [20, 24]
+
+merge_method: passthrough
+dtype: bfloat16

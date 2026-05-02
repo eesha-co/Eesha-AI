@@ -1,0 +1,95 @@
+# ============================================================
+# DREAM MERGE CONFIGURATION
+# Target: GLM-5 + Qwen3-14B + MiniMax-M2.7
+# ============================================================
+#
+# ⚠️  ARCHITECTURE INCOMPATIBILITY WARNING
+# These three models have FUNDAMENTALLY DIFFERENT architectures:
+#   - GLM-5:        GlmMoeDsa (MoE), hidden_size=6144, 78 layers, 754 GB
+#   - Qwen3-14B:    Qwen3,           hidden_size=5120, 40 layers,  30 GB
+#   - MiniMax-M2.7:  MiniMaxM2,       hidden_size=3072, 62 layers, 229 GB
+#
+# Direct merging with mergekit is NOT possible because:
+#   1. Hidden dimensions don't match (6144 vs 5120 vs 3072)
+#   2. GLM-5 is a Mixture-of-Experts model (different weight structure)
+#   3. Layer structures and attention mechanisms differ
+#
+# TO MAKE THIS WORK, you would need:
+#   A) Projection/adapter layers between different hidden sizes
+#   B) Architecture-agnostic merging (e.g., knowledge distillation)
+#   C) A unified architecture reimplementation
+#
+# This config serves as a BLUEPRINT for when compatible versions exist.
+# ============================================================
+
+# APPROACH 1: DARE-TIES merge (requires compatible architectures)
+# This would work IF all models shared the same base architecture
+models:
+  - model: zai-org/GLM-5
+    # Base model - The Spine (intelligence + long-term memory)
+  - model: Qwen/Qwen3-14B
+    # Expert A - The Wit (top layers for banter & quick jokes)
+    parameters:
+      density: 0.5
+      weight: 0.4
+  - model: MiniMaxAI/MiniMax-M2.7
+    # Expert B - The Empathy (attention layers for emotional support)
+    parameters:
+      density: 0.5
+      weight: 0.3
+
+merge_method: dare_ties
+base_model: zai-org/GLM-5
+parameters:
+  int8_mask: true
+  normalize: true
+dtype: bfloat16
+
+---
+
+# APPROACH 2: SLERP with layer-wise interpolation
+# Applies different interpolation factors to different layer types
+# Attention layers lean toward MiniMax-M2.7 (empathy)
+# MLP/top layers lean toward Qwen3-14B (wit)
+slices:
+  - sources:
+      - model: zai-org/GLM-5
+        layer_range: [0, 78]
+      - model: Qwen/Qwen3-14B
+        layer_range: [0, 40]
+    parameters:
+      t:
+        - filter: self_attn
+          value: [0, 0.2, 0.3, 0.2, 0.1]  # Mostly GLM-5 for attention
+        - filter: mlp
+          value: [0, 0.3, 0.5, 0.7, 1.0]  # Leaning Qwen3-14B for MLP (wit)
+        - value: 0.3  # Default: 70% GLM-5, 30% Qwen3-14B
+
+merge_method: slerp
+base_model: zai-org/GLM-5
+dtype: bfloat16
+
+---
+
+# APPROACH 3: Passthrough (Frankenstein-style layer stacking)
+# Stack top layers from Qwen3-14B on top of GLM-5
+# This CREATES a deeper model, not a blended one
+# ⚠️  Requires hidden_size to match (THEY DON'T - this is theoretical)
+slices:
+  # Bottom layers: GLM-5 foundation (intelligence backbone)
+  - sources:
+      - model: zai-org/GLM-5
+        layer_range: [0, 50]
+
+  # Middle layers: GLM-5 continued with empathy injection
+  - sources:
+      - model: zai-org/GLM-5
+        layer_range: [50, 65]
+
+  # Top layers: Qwen3-14B (wit - the sparkling top layers)
+  - sources:
+      - model: Qwen/Qwen3-14B
+        layer_range: [30, 40]
+
+merge_method: passthrough
+dtype: bfloat16

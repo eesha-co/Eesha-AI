@@ -1,0 +1,37 @@
+# ============================================================
+# PRACTICAL MERGE CONFIGURATION
+# Using compatible Qwen2.5-0.5B models as proxies
+# ============================================================
+#
+# Model mapping (soul transfer):
+#   GLM-5 (The Spine)     → Qwen/Qwen2.5-0.5B (base intelligence)
+#   Qwen3-14B (The Wit)   → Qwen/Qwen2.5-0.5B-Instruct (quick banter & jokes)
+#   MiniMax-M2.7 (Empathy) → theprint/TiTan-Qwen2.5-0.5B (conversational/emotional)
+#
+# All three are: model_type=qwen2, hidden_size=896, 24 layers
+# FULLY COMPATIBLE for mergekit!
+# ============================================================
+
+# === APPROACH A: DARE-TIES (Recommended) ===
+# Best for combining diverse expertise from multiple fine-tunes
+# Prunes redundant parameters, resolves sign conflicts
+models:
+  - model: Qwen/Qwen2.5-0.5B
+    # The Spine - no parameters needed for base model
+  - model: Qwen/Qwen2.5-0.5B-Instruct
+    # Expert A - The Wit (instruct-tuned for snappy responses)
+    parameters:
+      density: 0.5   # Keep 50% of the most significant params
+      weight: 0.4    # 40% influence on the merge
+  - model: theprint/TiTan-Qwen2.5-0.5B
+    # Expert B - The Empathy (conversational fine-tune)
+    parameters:
+      density: 0.5   # Keep 50% of the most significant params
+      weight: 0.3    # 30% influence on the merge
+
+merge_method: dare_ties
+base_model: Qwen/Qwen2.5-0.5B
+parameters:
+  int8_mask: true
+  normalize: true
+dtype: bfloat16

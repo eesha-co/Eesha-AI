@@ -208,14 +208,19 @@ export function AuthModal() {
       const data = await res.json();
 
       if (!res.ok) {
-        // Special case: user already exists but is unverified — auto-resend OTP
-        if (data.requiresOtpResend) {
+        // Special case: user already exists — if they're unverified, auto-resend
+        if (res.status === 409) {
           const otpRes = await fetch('/api/auth/resend-otp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email }),
           });
           if (otpRes.ok) {
+            const otpData = await otpRes.json();
+            if (otpData.alreadyVerified) {
+              setError('This email is already registered and verified. Please log in instead.');
+              return;
+            }
             setStep('verify');
             setResendCooldown(60);
             return;

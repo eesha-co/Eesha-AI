@@ -249,8 +249,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── STEP 4: Create Prisma DB record (best-effort) ──────────────────────
-    ensureDbUser(userId, normalizedEmail, null, password, username);
+    // ── STEP 4: Create Prisma DB record ───────────────────────────────────
+    // Await to prevent race condition — the DB record must exist before
+    // the user tries to log in after OTP verification.
+    await ensureDbUser(userId, normalizedEmail, null, password, username);
 
     console.log('[SIGNUP] Success — OTP sent to:', normalizedEmail);
     return NextResponse.json({

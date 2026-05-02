@@ -2,12 +2,14 @@ import type { NextAuthOptions } from "next-auth";
 import GithubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { createSignupClient, createServerSupabaseClient } from "@/lib/supabase-server";
 
 export const authOptions: NextAuthOptions = {
   // ─── Database Adapter ────────────────────────────────────────────────────
+  // PrismaAdapter is ONLY used for OAuth account linking (GitHub).
+  // For credentials login, we use Supabase Auth exclusively.
+  // Prisma connects to the same Supabase PostgreSQL database — NOT local storage.
   adapter: PrismaAdapter(db),
 
   // ─── Authentication Providers ─────────────────────────────────────────────
@@ -18,7 +20,7 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GITHUB_SECRET || "",
     }),
 
-    // Email + Password credentials — primary auth via Supabase Auth
+    // Email + Password credentials — verified against Supabase Auth ONLY
     CredentialsProvider({
       id: "credentials",
       name: "Email and Password",
@@ -34,12 +36,13 @@ export const authOptions: NextAuthOptions = {
         const email = credentials.email.toLowerCase().trim();
 
         try {
-          // ── STEP 1: Authenticate via Supabase Auth (primary) ─────────────
-          // Supabase Auth is the single source of truth for credentials.
-          // This validates the password against bcrypt in Supabase's auth system.
+          // ── STEP 1: Authenticate via Supabase Auth ───────────────────────
+          // Supabase Auth is the SOLE source of truth for credential verification.
+          // We call signInWithPassword() directly — no bcrypt, no Prisma for auth.
           console.log('[AUTH] Attempting signInWithPassword for:', email);
 
           let supabaseUser: any = null;
+          let supabaseError: any = null;
 
           try {
             const signupClient = createSignupClient();
@@ -52,10 +55,12 @@ export const authOptions: NextAuthOptions = {
               supabaseUser = data.user;
               console.log('[AUTH] signInWithPassword succeeded for:', email);
             } else if (error) {
-              console.error('[AUTH] signInWithPassword error:', error.message, '| status:', error.status);
+              supabaseError = error;
+              console.error('[AUTH] signInWithPassword error:', error.message, '| code:', error.code, '| status:', error.status);
             }
-          } catch (e) {
-            console.error('[AUTH] signInWithPassword threw:', e);
+          } catch (e: any) {
+            supabaseError = e;
+            console.error('[AUTH] signInWithPassword threw:', e?.message || e);
           }
 
           // ── STEP 2: If Supabase login succeeded → verify email & return ──
@@ -67,6 +72,7 @@ export const authOptions: NextAuthOptions = {
             }
 
             // Find or create user in Prisma DB (for NextAuth session management)
+            // This does NOT verify the password — it just ensures the Prisma record exists
             let user = await db.user.findUnique({ where: { email } });
 
             if (!user) {
@@ -107,38 +113,48 @@ export const authOptions: NextAuthOptions = {
             };
           }
 
-          // ── STEP 3: Supabase login failed — try local bcrypt as fallback ──
-          // This handles the rare case where Supabase Auth is temporarily
-          // unavailable or there's a sync issue. We do NOT auto-reset passwords.
-          console.log('[AUTH] Supabase login failed, trying local bcrypt fallback for:', email);
-          const localUser = await db.user.findUnique({ where: { email } });
+          // ── STEP 3: Supabase login failed → diagnose and return error ────
+          // Instead of silently trying bcrypt, we check the Supabase Auth
+          // admin API to give the user a SPECIFIC error message.
+          console.log('[AUTH] Supabase login failed for:', email, '| checking user status...');
 
-          if (localUser?.passwordHash) {
-            const passwordMatches = await bcrypt.compare(credentials.password, localUser.passwordHash);
-            if (passwordMatches) {
-              console.log('[AUTH] Local bcrypt match for:', email);
+          try {
+            const adminClient = createServerSupabaseClient();
 
-              // Check email verification
-              if (!localUser.emailVerified) {
-                throw new Error("EMAIL_NOT_VERIFIED");
-              }
+            // Find the user in Supabase Auth
+            const { data: usersData } = await adminClient.auth.admin.listUsers();
+            const supabaseUserRecord = usersData?.users?.find(
+              (u: any) => u.email?.toLowerCase() === email
+            );
 
-              return {
-                id: localUser.id,
-                email: localUser.email,
-                name: localUser.name || email.split("@")[0],
-                image: localUser.image,
-                emailVerified: localUser.emailVerified,
-              };
-            } else {
-              console.log('[AUTH] bcrypt password did not match for:', email);
+            if (!supabaseUserRecord) {
+              console.log('[AUTH] User not found in Supabase Auth:', email);
+              throw new Error("NO_ACCOUNT");
             }
-          } else {
-            console.log('[AUTH] No local user or passwordHash for:', email, '| hasUser:', !!localUser, '| hasHash:', !!localUser?.passwordHash);
+
+            // Check if email is confirmed
+            if (!supabaseUserRecord.email_confirmed_at) {
+              console.log('[AUTH] User exists but email not verified:', email);
+              throw new Error("EMAIL_NOT_VERIFIED");
+            }
+
+            // User exists and is verified, but password doesn't match
+            console.log('[AUTH] User exists, email verified, but password wrong:', email);
+            throw new Error("INVALID_PASSWORD");
+
+          } catch (adminErr: any) {
+            // Re-throw our specific errors
+            if (adminErr?.message === "NO_ACCOUNT" ||
+                adminErr?.message === "EMAIL_NOT_VERIFIED" ||
+                adminErr?.message === "INVALID_PASSWORD") {
+              throw adminErr;
+            }
+            // Admin API failed too — just return generic error
+            console.error('[AUTH] Admin API check failed:', adminErr);
           }
 
-          // ── Nothing worked — invalid credentials ────────────────────────
-          console.log('[AUTH] All login methods failed for:', email);
+          // ── Fallback: generic error ──────────────────────────────────────
+          console.log('[AUTH] All checks failed for:', email);
           throw new Error("Invalid email or password.");
 
         } catch (error: unknown) {

@@ -71,6 +71,7 @@ function OTPInput({ value, onChange, disabled }: {
         <input
           key={i}
           id={`otp-${i}`}
+          name={`otp-digit-${i}`}
           type="text"
           inputMode="numeric"
           maxLength={1}
@@ -84,6 +85,7 @@ function OTPInput({ value, onChange, disabled }: {
           onKeyDown={(e) => handleKeyDown(i, e)}
           onPaste={handlePaste}
           disabled={disabled}
+          aria-label={`Digit ${i + 1} of verification code`}
           className="size-11 rounded-lg border border-border bg-card text-center text-lg font-bold text-foreground outline-none transition-all focus:border-primary/50 focus:bg-accent focus:ring-1 focus:ring-primary/30 disabled:opacity-50"
         />
       ))}
@@ -252,7 +254,7 @@ export function AuthModal() {
       const res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp }),
+        body: JSON.stringify({ email, otp, password }),
       });
 
       const data = await res.json();
@@ -500,14 +502,17 @@ export function AuthModal() {
 
                         <div className="space-y-3">
                           <div>
-                            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Email address</label>
+                            <label htmlFor="modal-signup-email" className="mb-1.5 block text-xs font-medium text-muted-foreground">Email address</label>
                             <div className="relative">
                               <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                               <input
+                                id="modal-signup-email"
+                                name="email"
                                 type="email"
                                 value={email}
                                 onChange={(e) => { setEmail(e.target.value); setError(''); }}
                                 placeholder="you@example.com"
+                                autoComplete="email"
                                 autoFocus
                                 className="w-full rounded-xl border border-border bg-card py-3 pl-10 pr-4 text-sm text-foreground placeholder-muted-foreground outline-none transition-all focus:border-primary/50 focus:bg-accent focus:ring-1 focus:ring-primary/30"
                               />
@@ -536,14 +541,17 @@ export function AuthModal() {
                       >
                         <div className="space-y-3">
                           <div>
-                            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Create a password</label>
+                            <label htmlFor="modal-signup-password" className="mb-1.5 block text-xs font-medium text-muted-foreground">Create a password</label>
                             <div className="relative">
                               <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                               <input
+                                id="modal-signup-password"
+                                name="password"
                                 type={showPassword ? 'text' : 'password'}
                                 value={password}
                                 onChange={(e) => { setPassword(e.target.value); setError(''); }}
                                 placeholder="At least 8 characters"
+                                autoComplete="new-password"
                                 autoFocus
                                 className="w-full rounded-xl border border-border bg-card py-3 pl-10 pr-10 text-sm text-foreground placeholder-muted-foreground outline-none transition-all focus:border-primary/50 focus:bg-accent focus:ring-1 focus:ring-primary/30"
                               />
@@ -815,14 +823,17 @@ export function AuthModal() {
 
                     <div className="space-y-3">
                       <div>
-                        <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Email address</label>
+                        <label htmlFor="modal-login-email" className="mb-1.5 block text-xs font-medium text-muted-foreground">Email address</label>
                         <div className="relative">
                           <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                           <input
+                            id="modal-login-email"
+                            name="email"
                             type="email"
                             value={email}
                             onChange={(e) => { setEmail(e.target.value); setError(''); }}
                             placeholder="you@example.com"
+                            autoComplete="email"
                             autoFocus
                             className="w-full rounded-xl border border-border bg-card py-3 pl-10 pr-4 text-sm text-foreground placeholder-muted-foreground outline-none transition-all focus:border-primary/50 focus:bg-accent focus:ring-1 focus:ring-primary/30"
                           />
@@ -830,14 +841,17 @@ export function AuthModal() {
                       </div>
 
                       <div>
-                        <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Password</label>
+                        <label htmlFor="modal-login-password" className="mb-1.5 block text-xs font-medium text-muted-foreground">Password</label>
                         <div className="relative">
                           <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                           <input
+                            id="modal-login-password"
+                            name="password"
                             type={showPassword ? 'text' : 'password'}
                             value={password}
                             onChange={(e) => { setPassword(e.target.value); setError(''); }}
                             placeholder="Enter your password"
+                            autoComplete="current-password"
                             className="w-full rounded-xl border border-border bg-card py-3 pl-10 pr-10 text-sm text-foreground placeholder-muted-foreground outline-none transition-all focus:border-primary/50 focus:bg-accent focus:ring-1 focus:ring-primary/30"
                           />
                           <button

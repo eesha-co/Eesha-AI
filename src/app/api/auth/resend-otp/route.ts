@@ -5,16 +5,15 @@ import { createSignupClient, createServerSupabaseClient } from '@/lib/supabase-s
 const resendAttempts = new Map<string, { count: number; resetTime: number }>();
 const MAX_RESEND_ATTEMPTS = 5;
 const RESEND_WINDOW_MS = 15 * 60_000;
-const RESEND_COOLDOWN_MS = 60_000; // 1 minute between resends (Supabase enforced)
+const RESEND_COOLDOWN_MS = 60_000;
 
 const lastResendTime = new Map<string, number>();
 
 // ─── POST /api/auth/resend-otp ────────────────────────────────────────────────
 //
-// Resend verification email using Supabase resend() method:
-//   1. Verify user exists and isn't already confirmed
-//   2. Call resend({ type: 'signup' }) — resends the verification email
-//   3. Done
+// Resend verification email via Supabase Auth (email delivery only).
+// We check our `users` table to see if the user exists and is unverified,
+// then use Supabase to resend the OTP code.
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,17 +50,9 @@ export async function POST(request: NextRequest) {
       entry.count++;
     }
 
-    // ── Verify the user exists before sending ───────────────────────────────
-    let adminClient;
-    try {
-      adminClient = createServerSupabaseClient();
-    } catch (envError) {
-      console.error('[RESEND-OTP] Missing Supabase env vars:', envError);
-      return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });
-    }
-
-    const { data: usersData } = await adminClient.auth.admin.listUsers();
-    const user = usersData?.users?.find(u => u.email?.toLowerCase() === emailKey);
+    // ── Check our `users` table first ──────────────────────────────────────
+    const { db } = await import('@/lib/db');
+    const user = await db.user.findUnique({ where: { email: emailKey } });
 
     if (!user) {
       return NextResponse.json(
@@ -71,7 +62,7 @@ export async function POST(request: NextRequest) {
     }
 
     // If already verified, tell them to log in
-    if (user.email_confirmed_at) {
+    if (user.emailVerified) {
       return NextResponse.json({
         success: true,
         message: 'Your email is already verified. You can sign in now.',
@@ -79,7 +70,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // ── Resend verification email ──────────────────────────────────────────
+    // ── Resend verification email via Supabase Auth ────────────────────────
+    // Try type 'signup' first, then fall back to signInWithOtp
     let anonClient;
     try {
       anonClient = createSignupClient();
@@ -88,7 +80,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });
     }
 
-    // Try type 'signup' first (standard for signUp-created users)
     console.log('[RESEND-OTP] Resending with type=signup for:', emailKey);
     const { error: resendError } = await anonClient.auth.resend({
       type: 'signup',
@@ -98,13 +89,11 @@ export async function POST(request: NextRequest) {
     if (resendError) {
       console.error('[RESEND-OTP] resend(signup) failed:', resendError.message);
 
-      // Fallback: try signInWithOtp as a last resort
+      // Fallback: try signInWithOtp
       console.log('[RESEND-OTP] Falling back to signInWithOtp for:', emailKey);
       const { error: otpError } = await anonClient.auth.signInWithOtp({
         email: emailKey,
-        options: {
-          shouldCreateUser: false,
-        },
+        options: { shouldCreateUser: false },
       });
 
       if (otpError) {

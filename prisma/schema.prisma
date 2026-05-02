@@ -16,7 +16,7 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
-  passwordHash  String?   // bcrypt hash backup — never plain text. Primary auth is Supabase Auth.
+  passwordHash  String?   // bcrypt-encrypted password — our primary auth. Never plain text.
   accounts      Account[]
   sessions      Session[]
   conversations Conversation[]

@@ -71,3 +71,4 @@ bun.lock
 # Logo PNG - large original (downloaded during Docker build, not committed)
 public/logo.png
 .next/
+public/transparent-logo.png

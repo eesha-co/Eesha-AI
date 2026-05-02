@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSignupClient, createServerSupabaseClient } from '@/lib/supabase-server';
+import bcrypt from 'bcryptjs';
 
 // ─── POST /api/auth/diagnose ─────────────────────────────────────────────────
 // Diagnostic endpoint to debug login issues.
-// Tests Supabase Auth connection and returns detailed error info.
-// This should be removed or secured in production.
+// Checks the `users` table directly and tests bcrypt comparison.
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,100 +22,52 @@ export async function POST(request: NextRequest) {
 
     // ── Step 1: Check environment variables ──────────────────────────────
     results.env = {
+      DATABASE_URL: !!process.env.DATABASE_URL,
+      NEXTAUTH_SECRET: !!process.env.NEXTAUTH_SECRET,
       SUPABASE_URL: !!process.env.SUPABASE_URL,
       SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY,
-      SUPABASE_SERVICE_KEY: !!process.env.SUPABASE_SERVICE_KEY,
-      NEXTAUTH_SECRET: !!process.env.NEXTAUTH_SECRET,
     };
 
-    // ── Step 2: Check user in Supabase Auth (admin API) ──────────────────
+    // ── Step 2: Look up user in our `users` table ───────────────────────
     try {
-      const adminClient = createServerSupabaseClient();
-      const { data: usersData, error: listError } = await adminClient.auth.admin.listUsers();
+      const { db } = await import('@/lib/db');
+      const user = await db.user.findUnique({ where: { email: normalizedEmail } });
 
-      if (listError) {
-        results.adminApi = { error: listError.message };
+      if (user) {
+        results.userTable = {
+          found: true,
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          emailVerified: !!user.emailVerified,
+          emailVerifiedAt: user.emailVerified?.toISOString() || null,
+          hasPasswordHash: !!user.passwordHash,
+          passwordHashLength: user.passwordHash?.length || 0,
+          passwordHashPrefix: user.passwordHash?.substring(0, 7) || null, // Shows $2a$12$ (bcrypt)
+          createdAt: user.createdAt?.toISOString(),
+        };
+
+        // ── Step 3: Test bcrypt comparison (if password provided) ────────
+        if (password && user.passwordHash) {
+          const matches = await bcrypt.compare(password, user.passwordHash);
+          results.bcryptTest = {
+            passwordProvided: true,
+            hashExists: true,
+            passwordMatches: matches,
+          };
+        } else if (password && !user.passwordHash) {
+          results.bcryptTest = {
+            passwordProvided: true,
+            hashExists: false,
+            passwordMatches: false,
+            issue: 'No password hash stored in users table',
+          };
+        }
       } else {
-        const user = usersData?.users?.find((u: any) => u.email?.toLowerCase() === normalizedEmail);
-        if (user) {
-          results.supabaseUser = {
-            found: true,
-            id: user.id,
-            email: user.email,
-            emailConfirmed: !!user.email_confirmed_at,
-            emailConfirmedAt: user.email_confirmed_at || null,
-            createdAt: user.created_at,
-            lastSignInAt: user.last_sign_in_at || null,
-            hasPassword: !!(user as any).encrypted_password && (user as any).encrypted_password !== '',
-            provider: user.app_metadata?.provider || 'unknown',
-            providers: user.app_metadata?.providers || [],
-          };
-        } else {
-          results.supabaseUser = { found: false };
-        }
+        results.userTable = { found: false };
       }
-    } catch (err: any) {
-      results.adminApi = { error: err?.message || String(err) };
-    }
-
-    // ── Step 3: Test signInWithPassword (if password provided) ───────────
-    if (password) {
-      try {
-        const signupClient = createSignupClient();
-        const { data, error } = await signupClient.auth.signInWithPassword({
-          email: normalizedEmail,
-          password,
-        });
-
-        if (error) {
-          results.signInTest = {
-            success: false,
-            error: error.message,
-            code: error.code || null,
-            status: error.status || null,
-          };
-        } else {
-          results.signInTest = {
-            success: true,
-            userId: data.user?.id,
-            emailConfirmed: !!data.user?.email_confirmed_at,
-          };
-        }
-      } catch (err: any) {
-        results.signInTest = {
-          success: false,
-          error: err?.message || String(err),
-        };
-      }
-    }
-
-    // ── Step 4: Test direct REST API call ────────────────────────────────
-    // This bypasses the Supabase JS client to test the raw API
-    if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY && password) {
-      try {
-        const restResponse = await fetch(
-          `${process.env.SUPABASE_URL}/auth/v1/token?grant_type=password`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': process.env.SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`,
-            },
-            body: JSON.stringify({ email: normalizedEmail, password }),
-          }
-        );
-
-        const restData = await restResponse.json();
-        results.restApiTest = {
-          status: restResponse.status,
-          success: restResponse.status === 200,
-          error: restData.error_description || restData.msg || null,
-          code: restData.code || null,
-        };
-      } catch (err: any) {
-        results.restApiTest = { error: err?.message || String(err) };
-      }
+    } catch (dbErr: any) {
+      results.userTable = { error: dbErr?.message || String(dbErr) };
     }
 
     return NextResponse.json(results);

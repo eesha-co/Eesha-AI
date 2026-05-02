@@ -66,12 +66,6 @@ export const authOptions: NextAuthOptions = {
             throw new Error("INVALID_PASSWORD");
           }
 
-          // ── Check email verification ─────────────────────────────────────
-          if (!user.emailVerified) {
-            console.log('[AUTH] Email not verified:', email);
-            throw new Error("EMAIL_NOT_VERIFIED");
-          }
-
           // ── Success — return the user ────────────────────────────────────
           console.log('[AUTH] Login successful for:', email);
           return {
@@ -79,7 +73,6 @@ export const authOptions: NextAuthOptions = {
             email: user.email,
             name: user.name || email.split("@")[0],
             image: user.image,
-            emailVerified: user.emailVerified,
           };
 
         } catch (error: unknown) {
@@ -116,7 +109,6 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.email = user.email;
-        token.emailVerified = user.emailVerified ?? null;
       }
       return token;
     },
@@ -124,7 +116,6 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        (session.user as any).emailVerified = token.emailVerified;
       }
       return session;
     },

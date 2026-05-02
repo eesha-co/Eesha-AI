@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSignupClient } from '@/lib/supabase-server';
 import bcrypt from 'bcryptjs';
+import { db } from '@/lib/db';
 
 // ─── Rate limiting for sign-up attempts ──────────────────────────────────────
 const signupAttempts = new Map<string, { count: number; resetTime: number }>();
@@ -23,18 +23,17 @@ function checkSignupRateLimit(ip: string): { allowed: boolean; retryAfter?: numb
 
 // ─── POST /api/auth/signup ────────────────────────────────────────────────────
 //
-// Custom auth flow — we own the credentials:
+// Custom auth flow — we own the credentials entirely:
 //
 //   1. Validate input + rate limit
 //   2. Check if email already exists in our `users` table
 //   3. Hash the password with bcrypt and store in `users` table
 //      → email, encrypted password (bcrypt hash), username
-//   4. Send OTP verification email via Supabase Auth (email delivery only)
-//   5. Mark email as unverified until user enters the OTP code
+//   4. Mark email as verified immediately (auto-verify)
+//   5. Return success — user can now log in
 //
 // The `users` table is in Supabase PostgreSQL (via Prisma + DATABASE_URL).
-// We do NOT rely on Supabase Auth for password storage or verification.
-// Supabase Auth is ONLY used to send the verification email.
+// We do NOT use Supabase Auth API at all. Pure custom authentication.
 
 export async function POST(request: NextRequest) {
   try {
@@ -85,46 +84,16 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-    const { db } = await import('@/lib/db');
 
     // ── STEP 1: Check if user already exists in our `users` table ───────────
     const existingUser = await db.user.findUnique({ where: { email: normalizedEmail } });
 
     if (existingUser) {
-      // User already exists
-      if (existingUser.emailVerified) {
-        // Already verified — tell them to log in
-        return NextResponse.json(
-          { error: 'An account with this email already exists. Please log in instead.' },
-          { status: 409 }
-        );
-      }
-      // Not verified yet — update their password and resend verification
-      const newHash = await bcrypt.hash(password, 12);
-      await db.user.update({
-        where: { id: existingUser.id },
-        data: {
-          passwordHash: newHash,
-          name: username || existingUser.name,
-        },
-      });
-      console.log('[SIGNUP] Updated password for unverified user:', normalizedEmail);
-
-      // Resend OTP via Supabase Auth
-      try {
-        const signupClient = createSignupClient();
-        await signupClient.auth.resend({ type: 'signup', email: normalizedEmail });
-        console.log('[SIGNUP] Verification email resent to:', normalizedEmail);
-      } catch (resendErr) {
-        console.error('[SIGNUP] Could not resend verification email:', resendErr);
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: 'A new verification code has been sent to your email.',
-        email: normalizedEmail,
-        emailConfirmed: false,
-      });
+      // User already exists — tell them to log in
+      return NextResponse.json(
+        { error: 'An account with this email already exists. Please log in instead.' },
+        { status: 409 }
+      );
     }
 
     // ── STEP 2: Hash the password with bcrypt ──────────────────────────────
@@ -135,66 +104,35 @@ export async function POST(request: NextRequest) {
     const passwordHash = await bcrypt.hash(password, 12);
 
     // ── STEP 3: Create user in our `users` table ───────────────────────────
-    // This is the PRIMARY credential store. Email is marked unverified
-    // until the user enters the OTP code sent to their email.
+    // Email is auto-verified (emailVerified set to current time).
+    // All credentials live in our Supabase PostgreSQL `users` table via Prisma.
     const newUser = await db.user.create({
       data: {
         email: normalizedEmail,
         name: username || normalizedEmail.split('@')[0],
         passwordHash,
-        emailVerified: null, // Will be set after OTP verification
+        emailVerified: new Date(), // Auto-verify — no OTP needed
       },
     });
     console.log('[SIGNUP] User created in users table:', normalizedEmail, '| id:', newUser.id);
 
-    // ── STEP 4: Send OTP verification email via Supabase Auth ──────────────
-    // We use Supabase Auth ONLY as an email delivery service.
-    // We call signUp() which triggers the "Confirm signup" email template.
-    // The actual password in Supabase Auth doesn't matter — we verify
-    // against our own `users` table.
-    try {
-      const signupClient = createSignupClient();
-      const { error: signUpError } = await signupClient.auth.signUp({
-        email: normalizedEmail,
-        password, // Supabase requires a password, but we don't use theirs for login
-        options: {
-          data: {
-            username: username || undefined,
-            db_user_id: newUser.id, // Link to our users table
-          },
-        },
-      });
-
-      if (signUpError) {
-        console.error('[SIGNUP] Supabase signUp error:', signUpError.message);
-
-        // If Supabase says "already registered", that's fine — we already
-        // created our user record. The OTP email might still send.
-        const msg = signUpError.message.toLowerCase();
-        if (!msg.includes('already registered')) {
-          // Real error — but our user record is already created, so
-          // they can still verify later. Log and continue.
-          console.error('[SIGNUP] Non-critical Supabase error, user record is safe');
-        }
-      } else {
-        console.log('[SIGNUP] Verification email sent via Supabase for:', normalizedEmail);
-      }
-    } catch (supabaseErr) {
-      // Supabase email sending failed — our user record is still created.
-      // The user can request a resend later.
-      console.error('[SIGNUP] Supabase email sending failed (non-fatal):', supabaseErr);
-    }
-
-    console.log('[SIGNUP] Success — user created, verification email sent to:', normalizedEmail);
+    console.log('[SIGNUP] Success — user created and verified:', normalizedEmail);
     return NextResponse.json({
       success: true,
-      message: 'A verification code has been sent to your email.',
+      message: 'Account created successfully! You can now sign in.',
       email: normalizedEmail,
-      emailConfirmed: false,
+      emailConfirmed: true,
     });
 
   } catch (error) {
     console.error('[SIGNUP] Unexpected error:', error instanceof Error ? error.message : error);
+    // Provide more specific error for debugging
+    if (error instanceof Error) {
+      // Prisma unique constraint violation
+      if (error.message.includes('Unique constraint') || error.message.includes('unique')) {
+        return NextResponse.json({ error: 'An account with this email already exists. Please log in instead.' }, { status: 409 });
+      }
+    }
     return NextResponse.json({ error: 'An unexpected error occurred. Please try again.' }, { status: 500 });
   }
 }

@@ -59,35 +59,15 @@ export default function LoginPage() {
 
       if (result?.error) {
         // NextAuth maps thrown Errors to the error string.
-        // Our authorize() throws: EMAIL_NOT_VERIFIED, NO_ACCOUNT, INVALID_PASSWORD
+        // Our authorize() throws: NO_ACCOUNT, INVALID_PASSWORD
         const errType = result.error;
 
-        if (errType === 'EMAIL_NOT_VERIFIED') {
-          setError('Your email has not been verified yet. Please check your email for a verification code, or sign up again to resend it.');
-        } else if (errType === 'NO_ACCOUNT') {
+        if (errType === 'NO_ACCOUNT') {
           setError('No account found with this email. Please sign up first.');
         } else if (errType === 'INVALID_PASSWORD') {
-          setError('Incorrect password. Please try again or reset your password.');
+          setError('Incorrect password. Please try again.');
         } else {
-          // Fallback: check status via API for any other error
-          try {
-            const statusRes = await fetch('/api/auth/check-status', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email }),
-            });
-            const statusData = await statusRes.json();
-
-            if (statusData.status === 'unverified') {
-              setError('Your email has not been verified yet. Please check your email for a verification code, or sign up again to resend it.');
-            } else if (statusData.status === 'not_found') {
-              setError('No account found with this email. Please sign up first.');
-            } else {
-              setError('Invalid email or password. Please try again.');
-            }
-          } catch {
-            setError('Invalid email or password. Please try again.');
-          }
+          setError('Invalid email or password. Please try again.');
         }
       } else if (result?.ok) {
         window.location.href = '/';
@@ -130,7 +110,7 @@ export default function LoginPage() {
           <div className="space-y-4 mt-4">
             {[
               { icon: Brain, title: 'Multi-Agent Architecture', desc: 'Draft → Critique → Consensus pipeline' },
-              { icon: Shield, title: 'Enterprise Security', desc: 'End-to-end encryption, RLS, email verification' },
+              { icon: Shield, title: 'Enterprise Security', desc: 'End-to-end encryption & bcrypt password hashing' },
               { icon: Code2, title: 'Workspace & Terminal', desc: 'Full development environment access' },
               { icon: Infinity, title: 'Unlimited Conversations', desc: 'No caps on messages or sessions' },
             ].map(({ icon: Icon, title, desc }) => (
@@ -150,7 +130,7 @@ export default function LoginPage() {
         {/* Bottom security notice */}
         <div className="flex items-center gap-2">
           <Shield className="size-3.5 text-muted-foreground/60" />
-          <span className="text-xs text-muted-foreground/60">Protected by Supabase RLS & end-to-end encryption</span>
+          <span className="text-xs text-muted-foreground/60">Protected by bcrypt encryption & secure password hashing</span>
         </div>
       </div>
 
@@ -284,7 +264,7 @@ export default function LoginPage() {
           <div className="mt-6 flex items-center justify-center gap-1.5">
             <Shield className="size-3 text-foreground/15" />
             <span className="text-[10px] text-foreground/15">
-              Protected by Supabase RLS, end-to-end encryption &amp; email verification
+              Protected by bcrypt encryption &amp; secure password hashing
             </span>
           </div>
         </div>

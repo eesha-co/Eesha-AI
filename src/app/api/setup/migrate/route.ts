@@ -22,18 +22,18 @@ export async function POST(req: NextRequest) {
     // Since we can't run raw ALTER TABLE via PostgREST, we use the Supabase SQL API
     // via the management API. For simplicity, we check if the column exists.
 
-    // First, try to select a conversation with the mode column
+    // First, try to select a conversation with the chat_mode column
     const { error: testError } = await supabase
       .from('conversations')
-      .select('id, mode')
+      .select('id, chat_mode')
       .limit(1);
 
-    if (testError && testError.message.includes('column') && testError.message.includes('mode')) {
+    if (testError && testError.message.includes('column') && testError.message.includes('chat_mode')) {
       // Column doesn't exist — need migration
       return NextResponse.json({
         status: 'migration_needed',
-        message: 'The "mode" column does not exist in the conversations table. Please run the following SQL in your Supabase SQL Editor:',
-        sql: 'ALTER TABLE "conversations" ADD COLUMN IF NOT EXISTS "mode" TEXT NOT NULL DEFAULT \'code\';',
+        message: 'The "chat_mode" column does not exist in the conversations table. Please run the following SQL in your Supabase SQL Editor:',
+        sql: 'ALTER TABLE "conversations" ADD COLUMN IF NOT EXISTS "chat_mode" TEXT NOT NULL DEFAULT \'code\';',
         hint: 'Go to Supabase Dashboard → SQL Editor → paste the SQL above → click Run',
       });
     }
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     // Column exists
     return NextResponse.json({
       status: 'ok',
-      message: 'The "mode" column already exists in the conversations table.',
+      message: 'The "chat_mode" column already exists in the conversations table.',
     });
   } catch (error) {
     console.error('Migration check error:', error);

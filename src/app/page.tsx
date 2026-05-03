@@ -49,7 +49,7 @@ export default function Home() {
           // Ensure all conversations have a mode (backward compat)
           const normalized = data.map((c: Record<string, unknown>) => ({
             ...c,
-            mode: (c.mode as string) || 'code',
+            mode: (c.mode as string) || (c.chatMode as string) || 'code',
           }));
           setConversations(normalized);
         }

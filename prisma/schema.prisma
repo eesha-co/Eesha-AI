@@ -70,7 +70,7 @@ model VerificationToken {
 model Conversation {
   id        String    @id @default(cuid())
   title     String    @default("New Chat")
-  mode      String    @default("code")
+  chatMode  String    @default("code") @map("chat_mode")
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages  Message[]

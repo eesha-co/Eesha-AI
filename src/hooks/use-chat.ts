@@ -52,7 +52,7 @@ export function useChat() {
           const res = await fetch('/api/conversations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: 'New Chat', mode }),
+            body: JSON.stringify({ title: 'New Chat', chatMode: mode }),
           });
           const conv = await res.json();
           conversationId = conv.id;

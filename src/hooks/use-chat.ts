@@ -84,9 +84,14 @@ export function useChat() {
           conversationId = conv.id;
           addConversation({ ...conv, mode, messages: [] });
 
-          // Navigate to the conversation URL
-          if (!conv._anonymous && !conv.id.startsWith('temp-')) {
-            router.push(`/c/${conv.id}`);
+          // Update the URL to /c/[id] without full page navigation.
+          // We use window.history.replaceState to change the URL bar without
+          // triggering a Next.js re-render, which would interrupt streaming.
+          // The Zustand store holds the conversation state, so the UI stays correct.
+          // When the user refreshes or navigates, /c/[id] will load properly.
+          const targetUrl = `/c/${conv.id}`;
+          if (typeof window !== 'undefined') {
+            window.history.replaceState({ ...window.history.state, url: targetUrl }, '', targetUrl);
           }
         } catch {
           setError('Failed to create conversation');

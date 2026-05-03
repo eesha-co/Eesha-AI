@@ -47,20 +47,26 @@ export function ChatPageContent({ initialConversationId }: ChatPageContentProps)
   useEffect(() => {
     const loadConversations = async () => {
       try {
-        // If conversations are already loaded (e.g., from /c/[id] page), just set active
-        const currentConvs = useChatStore.getState().conversations;
-        if (currentConvs.length > 0) {
-          // Conversations already in store — just set active if needed
-          if (initialConversationId) {
-            const target = currentConvs.find((c) => c.id === initialConversationId);
-            if (target) {
-              setActiveConversation(target.id);
-              setActiveMode((target.mode as ChatMode) || 'code');
-            }
+        // If an initial conversation ID is provided, always ensure it's set active
+        // This handles the case where use-chat.ts created the conversation and
+        // navigated to /c/[id] — the conversation is in the store but may not be "active"
+        if (initialConversationId) {
+          const currentConvs = useChatStore.getState().conversations;
+          const target = currentConvs.find((c) => c.id === initialConversationId);
+          if (target) {
+            setActiveConversation(target.id);
+            setActiveMode((target.mode as ChatMode) || 'code');
+            // If we already have conversations loaded, no need to refetch
+            if (currentConvs.length > 0) return;
           }
-          return;
         }
 
+        const currentConvs = useChatStore.getState().conversations;
+        if (currentConvs.length > 0 && !initialConversationId) {
+          return; // Already loaded and no specific conversation to set
+        }
+
+        // Fetch conversations from server (for authenticated users with DB storage)
         const res = await fetch('/api/conversations');
         if (res.ok) {
           const data = await res.json();

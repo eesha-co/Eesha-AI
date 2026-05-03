@@ -13,6 +13,7 @@ export default function ConversationPage() {
   const setConversations = useChatStore((s) => s.setConversations);
   const setActiveConversation = useChatStore((s) => s.setActiveConversation);
   const setActiveMode = useChatStore((s) => s.setActiveMode);
+  const conversations = useChatStore((s) => s.conversations);
 
   const conversationId = params?.id as string;
   const hasLoadedRef = useRef(false);
@@ -24,6 +25,27 @@ export default function ConversationPage() {
     hasLoadedRef.current = true;
 
     const loadAndValidate = async () => {
+      // Check if the conversation is already in the local store
+      // This covers anonymous/temp conversations that aren't in the DB
+      const localConv = useChatStore.getState().conversations.find(
+        (c) => c.id === conversationId
+      );
+
+      if (localConv) {
+        // Found in local state — just set it active
+        setActiveConversation(localConv.id);
+        setActiveMode((localConv.mode as ChatMode) || 'code');
+        return;
+      }
+
+      // For anonymous/temp IDs, the conversation only exists in local state
+      // If we don't find it there, redirect to home
+      if (conversationId.startsWith('anon-') || conversationId.startsWith('temp-')) {
+        router.replace('/');
+        return;
+      }
+
+      // For real conversation IDs, try to load from the server
       try {
         const res = await fetch('/api/conversations');
         if (res.ok) {

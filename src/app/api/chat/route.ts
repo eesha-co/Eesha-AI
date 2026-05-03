@@ -239,27 +239,28 @@ const TOOLS = [
 // This is more secure than a blocklist because new/dangerous commands are
 // automatically rejected instead of needing to be discovered and blocked.
 const ALLOWED_COMMANDS: Array<{ pattern: RegExp; description: string }> = [
-  // File listing & reading
+  // File listing & reading (workspace-relative only — safePath enforces boundary)
   { pattern: /^ls\s*/, description: 'List files' },
   { pattern: /^ls$/, description: 'List files' },
   { pattern: /^cat\s+/, description: 'Read file' },
   { pattern: /^head\s+/, description: 'Read file head' },
   { pattern: /^tail\s+/, description: 'Read file tail' },
-  { pattern: /^less\s+/, description: 'Read file' },
   { pattern: /^wc\s+/, description: 'Count words/lines' },
   { pattern: /^file\s+/, description: 'Check file type' },
-  { pattern: /^find\s+/, description: 'Find files' },
   { pattern: /^tree\s*/, description: 'Tree listing' },
 
-  // Node.js / JavaScript
-  { pattern: /^node\s+/, description: 'Run Node.js script' },
-  { pattern: /^npx\s+/, description: 'Run npx package' },
+  // SECURITY: Removed `find` — can enumerate entire filesystem
+  // SECURITY: Removed `node -e` / `python3 -c` — can read /proc/1/environ and exec arbitrary code
+  // SECURITY: Removed `npx` — can run arbitrary packages
+  // SECURITY: Removed `less` — can shell out with !
+
+  // Node.js / JavaScript — ONLY script files within workspace, no -e inline code
+  { pattern: /^node\s+(?!-e)[^\s]+\.js/, description: 'Run Node.js script file' },
   { pattern: /^npm\s+(run|start|test|build|info|list|view|init)/, description: 'npm safe commands' },
-  { pattern: /^npx\s+prisma\s+/, description: 'Prisma CLI' },
   { pattern: /^tsc\s*/, description: 'TypeScript compiler' },
 
-  // Python (execution only, no server/network)
-  { pattern: /^python3?\s+/, description: 'Run Python script' },
+  // Python — ONLY script files within workspace, no -c inline code
+  { pattern: /^python3?\s+(?!-c)[^\s]+\.py/, description: 'Run Python script file' },
 
   // Git
   { pattern: /^git\s+(status|log|diff|branch|show|remote|init|add|commit|stash|tag|describe)/, description: 'Git safe commands' },
@@ -295,12 +296,31 @@ const ALLOWED_COMMANDS: Array<{ pattern: RegExp; description: string }> = [
 function isCommandSafe(command: string): { safe: boolean; reason?: string } {
   const trimmed = command.trim();
 
+  // SECURITY: Block attempts to access system paths that expose secrets
+  const dangerousPatterns = [
+    /\/proc\//,            // Process info (exposes env vars via /proc/1/environ)
+    /\/etc\//,             // System config files
+    /\/var\/log\//,        // System logs
+    /\/root\//,            // Root home
+    /\/sys\//,             // Kernel info
+    /environ/,             // /proc/*/environ files
+  ];
+  for (const pattern of dangerousPatterns) {
+    if (pattern.test(trimmed)) {
+      return { safe: false, reason: 'Access to system paths is not allowed.' };
+    }
+  }
+
   // Check against allowlist
   for (const { pattern, description } of ALLOWED_COMMANDS) {
     if (pattern.test(trimmed)) {
       // Secondary check: block pipe chains that include dangerous commands
       if (/[|;&`$]/.test(trimmed)) {
         return { safe: false, reason: 'Pipe chains and shell operators are not allowed' };
+      }
+      // Block newline injection (used to bypass checks with multi-line commands)
+      if (/\n|\r/.test(trimmed)) {
+        return { safe: false, reason: 'Multi-line commands are not allowed.' };
       }
       // Block any form of redirection that could overwrite system files
       if (/>\s*\//.test(trimmed)) {
@@ -323,14 +343,20 @@ const sanitizeOutput = (output: string): string => {
     .replace(/hf_[a-zA-Z0-9]+/g, '[REDACTED_TOKEN]')
     .replace(/postgresql:\/\/[^\s]+/g, '[REDACTED_DB_URL]')
     // Redact any Supabase project ref pattern (20-char alphanumeric)
-    .replace(/[a-z]{20}\.supabase\.co/g, '[REDACTED_PROJECT].supabase.co');
+    .replace(/[a-z]{20}\.supabase\.co/g, '[REDACTED_PROJECT].supabase.co')
+    // SECURITY: Redact environment variable values (KEY=VALUE patterns)
+    // This catches NEXTAUTH_SECRET, GITHUB_SECRET, SUPABASE_DB_PASSWORD, etc.
+    .replace(/(NEXTAUTH_SECRET|GITHUB_SECRET|SUPABASE_DB_PASSWORD|SETUP_SECRET|SUPABASE_SERVICE_KEY|SUPABASE_ANON_KEY|DATABASE_URL|DIRECT_URL|WEBHOOK_SECRET)\s*=\s*[^\s"']+/gi, '[REDACTED_$1]')
+    // SECURITY: Redact any remaining env-var-like patterns (common secret formats)
+    .replace(/([A-Z_]+_(?:KEY|SECRET|PASSWORD|TOKEN|CREDENTIAL))\s*=\s*[^\s"']+/gi, '[REDACTED]');
 };
 
 // ─── Tool execution ──────────────────────────────────────────────────────────
 // SECURITY: Some tools are restricted to authenticated users only
 
-// Tools that anonymous users CANNOT use (security-sensitive)
-const AUTHENTICATED_ONLY_TOOLS = ['run_command', 'delete_file'];
+// SECURITY: File tools restricted to prevent anonymous users from reading/writing
+// workspace files (which may contain other users' code) or executing commands.
+const AUTHENTICATED_ONLY_TOOLS = ['run_command', 'delete_file', 'create_file', 'edit_file', 'read_file'];
 
 async function executeTool(name: string, args: Record<string, unknown>, isAuthenticated: boolean): Promise<string> {
   // SECURITY: Block dangerous tools for anonymous users

@@ -83,19 +83,17 @@ export async function POST(request: NextRequest) {
 
     if (existingUser) {
       if (existingUser.emailVerified) {
-        // Already verified — tell them to log in
-        return NextResponse.json(
-          { error: 'An account with this email already exists. Please log in instead.' },
-          { status: 409 }
-        );
+        // SECURITY: Generic message to prevent email enumeration
+        return NextResponse.json({
+          success: true,
+          message: 'If an account exists with this email, a verification code has been sent.',
+          email: normalizedEmail,
+          emailConfirmed: false,
+        });
       }
-      // Not verified yet — update their password and resend verification
-      console.log('[SIGNUP] Updating password for unverified user:', normalizedEmail);
-      const newHash = await bcrypt.hash(password, 12);
-      await dbRest.updateUser(existingUser.id, {
-        passwordHash: newHash,
-        name: username || existingUser.name,
-      });
+      // SECURITY: Don't overwrite password for unverified users (prevents account takeover)
+      // Just resend the verification email so the original user can complete signup
+      console.log('[SIGNUP] Resending verification for unverified user:', normalizedEmail);
 
       // Resend OTP via Supabase Auth
       try {

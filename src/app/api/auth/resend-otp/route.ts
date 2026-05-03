@@ -54,11 +54,13 @@ export async function POST(request: NextRequest) {
     // ── Check our `users` table first ──────────────────────────────────────
     const user = await dbRest.findUserByEmail(emailKey);
 
+    // SECURITY: Always return success to prevent email enumeration
+    // Don't reveal whether the email exists or not
     if (!user) {
-      return NextResponse.json(
-        { error: 'No account found with this email. Please sign up first.' },
-        { status: 404 }
-      );
+      return NextResponse.json({
+        success: true,
+        message: 'If an account exists with this email, a verification code has been sent.',
+      });
     }
 
     // If already verified, tell them to log in

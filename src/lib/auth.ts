@@ -69,6 +69,7 @@ export const authOptions: NextAuthOptions = {
             email: user.email,
             name: user.name || email.split("@")[0],
             image: user.image,
+            emailVerified: user.emailVerified,
           };
 
         } catch (error: unknown) {
@@ -105,6 +106,9 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.email = user.email;
+        // SECURITY: Include emailVerified so middleware can enforce it
+        // Without this, workspace/terminal routes permanently return 403
+        token.emailVerified = (user as any).emailVerified || null;
       }
       return token;
     },
@@ -112,6 +116,8 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
+        // Expose emailVerified so the frontend knows verification status
+        (session.user as any).emailVerified = token.emailVerified || null;
       }
       return session;
     },

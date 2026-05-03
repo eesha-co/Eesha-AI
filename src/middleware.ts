@@ -304,28 +304,28 @@ export async function middleware(request: NextRequest) {
       );
     }
 
-    // Messages endpoint: require authentication — anonymous users cannot persist messages
-    if (endpointType === "messages" && !isAuthenticated) {
+    // Conversations endpoint: require authentication — all data stored in Supabase
+    if (endpointType === "conversations" && !isAuthenticated) {
       return NextResponse.json(
-        { error: "SIGN_IN_REQUIRED", message: "Message persistence requires sign-in." },
+        { error: "SIGN_IN_REQUIRED", message: "Please sign in to access conversations." },
         { status: 401 }
       );
     }
 
-    // Chat: check free tier credits for anonymous users
+    // Messages endpoint: require authentication — all data stored in Supabase
+    if (endpointType === "messages" && !isAuthenticated) {
+      return NextResponse.json(
+        { error: "SIGN_IN_REQUIRED", message: "Please sign in to save messages." },
+        { status: 401 }
+      );
+    }
+
+    // Chat: require authentication — no anonymous usage
     if (endpointType === "chat" && !isAuthenticated) {
-      const creditsUsed = getFreeCreditsUsed(request);
-      if (creditsUsed >= FREE_TIER_MAX) {
-        return NextResponse.json(
-          {
-            error: "FREE_LIMIT_REACHED",
-            message: "You've used all " + FREE_TIER_MAX + " free messages. Sign in for unlimited access!",
-            creditsUsed,
-            creditsMax: FREE_TIER_MAX,
-          },
-          { status: 403 }
-        );
-      }
+      return NextResponse.json(
+        { error: "SIGN_IN_REQUIRED", message: "Please sign in to use Eesha AI." },
+        { status: 401 }
+      );
     }
 
     // Rate limiting
@@ -356,21 +356,6 @@ export async function middleware(request: NextRequest) {
     const response = NextResponse.next({
       request: { headers: requestHeaders },
     });
-
-    // For anonymous chat requests, update the signed free credits cookie
-    if (endpointType === "chat" && !isAuthenticated) {
-      const creditsUsed = getFreeCreditsUsed(request);
-      const newCreditsUsed = creditsUsed + 1;
-      const cookieValue = JSON.stringify({ used: newCreditsUsed });
-      const signedValue = signCookieValue(cookieValue);
-      response.cookies.set(FREE_TIER_COOKIE, signedValue, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 60 * 60 * 24, // 24 hours
-        path: "/",
-      });
-    }
 
     return addSecurityHeaders(response);
   }

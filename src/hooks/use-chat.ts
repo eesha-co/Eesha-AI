@@ -32,21 +32,15 @@ export function useChat() {
   } = useChatStore();
 
   const refreshFiles = useWorkspaceStore((s) => s.refreshFiles);
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const FREE_TIER_MAX = 5;
-
-  // ─── Persist a message to the database ───────────────────────────────────────
+  // ─── Persist a message to Supabase ─────────────────────────────────────────
   const persistMessage = useCallback(
     async (conversationId: string, role: string, content: string, thinking?: string) => {
-      // Only persist for authenticated users with real (non-anonymous) conversation IDs
-      if (!session?.user) return;
-      if (conversationId.startsWith('anon-') || conversationId.startsWith('temp-')) return;
-
       try {
         await fetch(`/api/conversations/${conversationId}/messages`, {
           method: 'POST',
@@ -54,16 +48,24 @@ export function useChat() {
           body: JSON.stringify({ role, content, thinking }),
         });
       } catch {
-        // Silently fail — message is still in local state
+        // Silently fail — message is still in local Zustand state
       }
     },
-    [session?.user]
+    []
   );
 
   const sendMessage = useCallback(
     async (content: string, modeOverride?: string) => {
       setError(null);
       if (!content.trim()) return;
+
+      // ── Require authentication ──────────────────────────────────────────
+      if (sessionStatus === 'loading') return; // Wait for session to load
+      if (!session?.user) {
+        router.push('/signup');
+        setError('Please sign in to start a conversation.');
+        return;
+      }
 
       let conversationId = activeConversationId;
       const mode = (modeOverride as ChatMode) || useChatStore.getState().activeMode;
@@ -80,21 +82,33 @@ export function useChat() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title: 'New Chat', chatMode: mode }),
           });
+
+          // If unauthorized, redirect to signup
+          if (res.status === 401) {
+            router.push('/signup');
+            setError('Please sign in to start a conversation.');
+            return;
+          }
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `Failed to create conversation (HTTP ${res.status})`);
+          }
+
           const conv = await res.json();
           conversationId = conv.id;
           addConversation({ ...conv, mode, messages: [] });
 
           // Update the URL to /c/[id] without full page navigation.
-          // We use window.history.replaceState to change the URL bar without
+          // window.history.replaceState changes the URL bar without
           // triggering a Next.js re-render, which would interrupt streaming.
-          // The Zustand store holds the conversation state, so the UI stays correct.
-          // When the user refreshes or navigates, /c/[id] will load properly.
           const targetUrl = `/c/${conv.id}`;
           if (typeof window !== 'undefined') {
             window.history.replaceState({ ...window.history.state, url: targetUrl }, '', targetUrl);
           }
-        } catch {
-          setError('Failed to create conversation');
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Failed to create conversation';
+          setError(msg);
           return;
         }
       }
@@ -112,7 +126,7 @@ export function useChat() {
       };
       addMessage(conversationId, userMessage);
 
-      // Persist user message to database
+      // Persist user message to Supabase
       persistMessage(conversationId, 'user', content);
 
       // ─── iluma mode: Image generation (non-streaming) ──────────────
@@ -128,17 +142,6 @@ export function useChat() {
         setIsStreaming(true);
 
         try {
-          if (!session?.user) {
-            const currentCredits = useChatStore.getState().freeCreditsUsed;
-            if (currentCredits >= FREE_TIER_MAX) {
-              router.push('/signup');
-              setIsStreaming(false);
-              setError('FREE_LIMIT_REACHED');
-              return;
-            }
-            useChatStore.getState().incrementFreeCredits();
-          }
-
           const response = await fetch('/api/chat/image', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -157,7 +160,7 @@ export function useChat() {
             const assistantContent = `Generated image for: "${content.slice(0, 100)}"`;
             updateLastAssistantMessage(conversationId, assistantContent);
 
-            // Persist assistant message to database
+            // Persist assistant message to Supabase
             persistMessage(conversationId, 'assistant', assistantContent);
           }
         } catch (err) {
@@ -167,7 +170,7 @@ export function useChat() {
           const errorMessage = 'I encountered an issue generating the image. Please try again.';
           updateLastAssistantMessage(conversationId, errorMessage);
 
-          // Persist error message to database
+          // Persist error message to Supabase
           persistMessage(conversationId, 'assistant', errorMessage);
         } finally {
           setIsStreaming(false);
@@ -219,18 +222,6 @@ export function useChat() {
       abortControllerRef.current = new AbortController();
 
       try {
-        // ── Track free credits for anonymous users ──────────────────
-        if (!session?.user) {
-          const currentCredits = useChatStore.getState().freeCreditsUsed;
-          if (currentCredits >= FREE_TIER_MAX) {
-            router.push('/signup');
-            setIsStreaming(false);
-            setError('FREE_LIMIT_REACHED');
-            return;
-          }
-          useChatStore.getState().incrementFreeCredits();
-        }
-
         const apiRoute = MODE_API_ROUTES[mode];
         const response = await fetch(apiRoute, {
           method: 'POST',
@@ -241,18 +232,18 @@ export function useChat() {
 
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
-          if (errData.error === 'FREE_LIMIT_REACHED') {
+
+          // If unauthorized, redirect to signup
+          if (response.status === 401) {
             setDeliberating(conversationId, false);
-            updateLastAssistantMessage(
-              conversationId,
-              `You've used all ${errData.creditsMax || FREE_TIER_MAX} free messages! Sign in for unlimited access.`
-            );
+            updateLastAssistantMessage(conversationId, 'Please sign in to continue.');
             setIsStreaming(false);
             resetAgentStatuses(conversationId);
-            setError('FREE_LIMIT_REACHED');
+            setError('Please sign in to continue.');
             router.push('/signup');
             return;
           }
+
           throw new Error(errData.error || `HTTP ${response.status}`);
         }
 
@@ -344,7 +335,7 @@ export function useChat() {
           refreshFiles();
         }
 
-        // Persist the final assistant message to database
+        // Persist the final assistant message to Supabase
         if (fullContent) {
           persistMessage(conversationId, 'assistant', fullContent, fullThinking || undefined);
         }
@@ -389,7 +380,7 @@ export function useChat() {
         abortControllerRef.current = null;
       }
     },
-    [activeConversationId, activeMode, addConversation, addMessage, updateLastAssistantMessage, setIsStreaming, updateConversationTitle, refreshFiles, setDeliberating, setAgentStatus, resetAgentStatuses, addImageToMessage, router, setActiveMode, setActiveConversation, persistMessage, session?.user]
+    [activeConversationId, activeMode, addConversation, addMessage, updateLastAssistantMessage, setIsStreaming, updateConversationTitle, refreshFiles, setDeliberating, setAgentStatus, resetAgentStatuses, addImageToMessage, router, setActiveMode, setActiveConversation, persistMessage, session?.user, sessionStatus]
   );
 
   const stopStreaming = useCallback(() => {

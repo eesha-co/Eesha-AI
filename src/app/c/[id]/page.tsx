@@ -13,7 +13,6 @@ export default function ConversationPage() {
   const setConversations = useChatStore((s) => s.setConversations);
   const setActiveConversation = useChatStore((s) => s.setActiveConversation);
   const setActiveMode = useChatStore((s) => s.setActiveMode);
-  const conversations = useChatStore((s) => s.conversations);
 
   const conversationId = params?.id as string;
   const hasLoadedRef = useRef(false);
@@ -24,35 +23,38 @@ export default function ConversationPage() {
     if (hasLoadedRef.current) return;
     hasLoadedRef.current = true;
 
+    // Require authentication
+    if (status === 'unauthenticated') {
+      router.replace('/signup');
+      return;
+    }
+
     const loadAndValidate = async () => {
-      // Check if the conversation is already in the local store
-      // This covers anonymous/temp conversations that aren't in the DB
+      // Check if the conversation is already in the local Zustand store
+      // This covers conversations just created in the current session
       const localConv = useChatStore.getState().conversations.find(
         (c) => c.id === conversationId
       );
 
       if (localConv) {
-        // Found in local state — just set it active
         setActiveConversation(localConv.id);
         setActiveMode((localConv.mode as ChatMode) || 'code');
         return;
       }
 
-      // For anonymous/temp IDs, the conversation only exists in local state
-      // If we don't find it there, redirect to home
-      if (conversationId.startsWith('anon-') || conversationId.startsWith('temp-')) {
-        router.replace('/');
-        return;
-      }
-
-      // For real conversation IDs, try to load from the server
+      // Fetch from Supabase via REST API
       try {
         const res = await fetch('/api/conversations');
+        if (res.status === 401) {
+          router.replace('/signup');
+          return;
+        }
+
         if (res.ok) {
           const data = await res.json();
           const normalized = data.map((c: Record<string, unknown>) => ({
             ...c,
-            mode: (c.mode as string) || (c.chatMode as string) || 'code',
+            mode: (c.mode as string) || (c.chat_mode as string) || (c.chatMode as string) || 'code',
           }));
           setConversations(normalized);
 
@@ -89,6 +91,10 @@ export default function ConversationPage() {
         </div>
       </div>
     );
+  }
+
+  if (status === 'unauthenticated') {
+    return null; // Will redirect in useEffect
   }
 
   return <ChatPageContent initialConversationId={conversationId} />;

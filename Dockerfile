@@ -91,7 +91,11 @@ echo "Auth: NextAuth.js"
 
 # Sync Prisma schema to database (creates tables, adds new columns like passwordHash)
 echo "Syncing database schema..."
-npx prisma db push --skip-generate 2>&1 || echo "Warning: DB schema sync failed (non-fatal, tables may already exist)"
+npx prisma db push --skip-generate 2>&1 || echo "Warning: Prisma db push failed (IPv4/IPv6 issue on HF Spaces)"
+
+# Ensure required Supabase tables exist (fallback using REST API if Prisma can't connect)
+echo "Checking required database tables..."
+node scripts/ensure-tables.js 2>/dev/null || echo "Warning: Table check failed (non-fatal)"
 
 # Update Supabase email templates to use OTP codes instead of links
 echo "Updating email templates..."

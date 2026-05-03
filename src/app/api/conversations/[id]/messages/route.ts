@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, isDatabaseAvailable } from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { getAuthUserId, unauthorizedResponse, forbiddenResponse } from '@/lib/api-auth';
+import { nanoid } from 'nanoid';
 
 export const runtime = 'nodejs';
 
@@ -45,7 +46,7 @@ function validateMessageInput(body: unknown): { valid: boolean; error?: string; 
     }
   }
 
-  // Sanitize: strip HTML/script injection (basic)
+  // Sanitize: strip script injection (basic)
   const sanitizedContent = content.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
   const sanitizedThinking = thinking
     ? String(thinking).replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
@@ -72,15 +73,7 @@ export async function POST(
     return unauthorizedResponse();
   }
 
-  // 2. Check database availability
-  if (!isDatabaseAvailable()) {
-    return NextResponse.json(
-      { error: 'Database unavailable. Please try again later.' },
-      { status: 503 }
-    );
-  }
-
-  // 3. Get conversation ID from params
+  // 2. Get conversation ID from params
   const { id: conversationId } = await params;
   if (!conversationId || typeof conversationId !== 'string') {
     return NextResponse.json(
@@ -89,7 +82,7 @@ export async function POST(
     );
   }
 
-  // 4. Parse and validate request body
+  // 3. Parse and validate request body
   let body: unknown;
   try {
     body = await req.json();
@@ -110,53 +103,125 @@ export async function POST(
 
   const { role, content, thinking } = validation.data!;
 
-  // 5. Verify conversation exists AND belongs to authenticated user
   try {
-    const conversation = await db.conversation.findUnique({
-      where: { id: conversationId },
-      select: { userId: true },
-    });
+    const supabase = createServerSupabaseClient();
 
-    if (!conversation) {
+    // 4. Verify conversation exists AND belongs to authenticated user
+    const { data: conv, error: findError } = await supabase
+      .from('conversations')
+      .select('userId')
+      .eq('id', conversationId)
+      .maybeSingle();
+
+    if (findError || !conv) {
       return NextResponse.json(
         { error: 'Conversation not found.' },
         { status: 404 }
       );
     }
 
-    if (conversation.userId !== userId) {
+    if (conv.userId !== userId) {
       return forbiddenResponse('You do not have permission to add messages to this conversation.');
     }
-  } catch (error) {
-    console.error('Failed to verify conversation ownership:', error);
-    return NextResponse.json(
-      { error: 'Failed to verify conversation.' },
-      { status: 500 }
-    );
-  }
 
-  // 6. Save the message
-  try {
-    const message = await db.message.create({
-      data: {
+    // 5. Save the message
+    const messageId = `cl${nanoid(22)}`;
+    const { data: message, error: insertError } = await supabase
+      .from('messages')
+      .insert({
+        id: messageId,
         role,
         content,
         thinking: thinking || null,
         conversationId,
-      },
-    });
+        createdAt: new Date().toISOString(),
+      })
+      .select()
+      .single();
 
-    // Update conversation's updatedAt timestamp
-    await db.conversation.update({
-      where: { id: conversationId },
-      data: { updatedAt: new Date() },
-    });
+    if (insertError) {
+      console.error('[MESSAGES] POST error:', insertError.message);
+      return NextResponse.json(
+        { error: 'Failed to save message.' },
+        { status: 500 }
+      );
+    }
+
+    // 6. Update conversation's updatedAt timestamp
+    await supabase
+      .from('conversations')
+      .update({ updatedAt: new Date().toISOString() })
+      .eq('id', conversationId);
 
     return NextResponse.json(message, { status: 201 });
   } catch (error) {
-    console.error('Failed to save message:', error);
+    console.error('[MESSAGES] POST unexpected error:', error);
     return NextResponse.json(
       { error: 'Failed to save message.' },
+      { status: 500 }
+    );
+  }
+}
+
+// ─── GET: List messages for a conversation ─────────────────────────────────────
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const userId = await getAuthUserId();
+  if (!userId) {
+    return unauthorizedResponse();
+  }
+
+  const { id: conversationId } = await params;
+  if (!conversationId || typeof conversationId !== 'string') {
+    return NextResponse.json(
+      { error: 'Conversation ID is required.' },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const supabase = createServerSupabaseClient();
+
+    // Verify ownership
+    const { data: conv, error: findError } = await supabase
+      .from('conversations')
+      .select('userId')
+      .eq('id', conversationId)
+      .maybeSingle();
+
+    if (findError || !conv) {
+      return NextResponse.json(
+        { error: 'Conversation not found.' },
+        { status: 404 }
+      );
+    }
+
+    if (conv.userId !== userId) {
+      return forbiddenResponse('You do not have permission to view this conversation.');
+    }
+
+    // Fetch messages
+    const { data: messages, error: msgError } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('conversationId', conversationId)
+      .order('createdAt', { ascending: true });
+
+    if (msgError) {
+      console.error('[MESSAGES] GET error:', msgError.message);
+      return NextResponse.json(
+        { error: 'Failed to fetch messages.' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(messages || []);
+  } catch (error) {
+    console.error('[MESSAGES] GET unexpected error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch messages.' },
       { status: 500 }
     );
   }

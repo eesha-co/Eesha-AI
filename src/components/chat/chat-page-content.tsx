@@ -70,10 +70,10 @@ export function ChatPageContent({ initialConversationId }: ChatPageContentProps)
         const res = await fetch('/api/conversations');
         if (res.ok) {
           const data = await res.json();
-          // Ensure all conversations have a mode (backward compat)
+          // Ensure all conversations have a mode (backward compat with chat_mode and chatMode)
           const normalized = data.map((c: Record<string, unknown>) => ({
             ...c,
-            mode: (c.mode as string) || (c.chatMode as string) || 'code',
+            mode: (c.mode as string) || (c.chat_mode as string) || (c.chatMode as string) || 'code',
           }));
           setConversations(normalized);
 

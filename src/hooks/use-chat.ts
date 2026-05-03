@@ -1,10 +1,18 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { useChatStore } from '@/stores/chat-store';
+import { useChatStore, ChatMode } from '@/stores/chat-store';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+
+// ─── API route mapping by mode ─────────────────────────────────────────────────
+const MODE_API_ROUTES: Record<ChatMode, string> = {
+  code: '/api/chat',
+  iluma: '/api/chat/image',
+  health: '/api/chat/health',
+  chat: '/api/chat/general',
+};
 
 export function useChat() {
   const {
@@ -13,10 +21,13 @@ export function useChat() {
     updateLastAssistantMessage,
     setIsStreaming,
     activeConversationId,
+    activeMode,
     updateConversationTitle,
     setDeliberating,
     setAgentStatus,
     resetAgentStatuses,
+    addImageToMessage,
+    setActiveMode,
   } = useChatStore();
 
   const refreshFiles = useWorkspaceStore((s) => s.refreshFiles);
@@ -34,17 +45,18 @@ export function useChat() {
       if (!content.trim()) return;
 
       let conversationId = activeConversationId;
+      const mode = useChatStore.getState().activeMode;
 
       if (!conversationId) {
         try {
           const res = await fetch('/api/conversations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: 'New Chat' }),
+            body: JSON.stringify({ title: 'New Chat', mode }),
           });
           const conv = await res.json();
           conversationId = conv.id;
-          addConversation({ ...conv, messages: [] });
+          addConversation({ ...conv, mode, messages: [] });
         } catch {
           setError('Failed to create conversation');
           return;
@@ -64,12 +76,89 @@ export function useChat() {
       };
       addMessage(conversationId, userMessage);
 
+      // ─── iluma mode: Image generation (non-streaming) ──────────────
+      if (mode === 'iluma') {
+        const assistantMessage = {
+          id: `assistant-${Date.now()}`,
+          role: 'assistant' as const,
+          content: '',
+          images: [],
+          createdAt: new Date().toISOString(),
+        };
+        addMessage(conversationId, assistantMessage);
+        setIsStreaming(true);
+
+        try {
+          if (!session?.user) {
+            const currentCredits = useChatStore.getState().freeCreditsUsed;
+            if (currentCredits >= FREE_TIER_MAX) {
+              router.push('/signup');
+              setIsStreaming(false);
+              setError('FREE_LIMIT_REACHED');
+              return;
+            }
+            useChatStore.getState().incrementFreeCredits();
+          }
+
+          const response = await fetch('/api/chat/image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: content, size: '1024x1024' }),
+          });
+
+          if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+
+          if (data.image) {
+            addImageToMessage(conversationId, data.image);
+            updateLastAssistantMessage(
+              conversationId,
+              `Generated image for: "${content.slice(0, 100)}"`
+            );
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Failed to generate image';
+          console.error('iluma error:', msg);
+          setError(msg);
+          updateLastAssistantMessage(
+            conversationId,
+            'I encountered an issue generating the image. Please try again.'
+          );
+        } finally {
+          setIsStreaming(false);
+        }
+
+        // Update title on first message
+        const currentConv = useChatStore.getState().conversations.find(
+          (c) => c.id === conversationId
+        );
+        if (currentConv && currentConv.messages.filter((m) => m.role === 'user').length === 1) {
+          const newTitle = content.slice(0, 60) + (content.length > 60 ? '...' : '');
+          updateConversationTitle(conversationId, newTitle);
+          fetch('/api/conversations', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: conversationId, title: newTitle }),
+          }).catch(() => {});
+        }
+
+        return;
+      }
+
+      // ─── Code, Health, Chat modes: Streaming SSE ───────────────────
+      const isCodeMode = mode === 'code';
       const assistantMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant' as const,
         content: '',
-        isDeliberating: true,
-        agentStatuses: { architect: 'idle', security: 'idle', optimizer: 'idle' } as Record<string, 'idle' | 'working' | 'done' | 'error'>,
+        isDeliberating: isCodeMode,
+        agentStatuses: isCodeMode
+          ? { architect: 'idle', security: 'idle', optimizer: 'idle' } as Record<string, 'idle' | 'working' | 'done' | 'error'>
+          : undefined,
         createdAt: new Date().toISOString(),
       };
       addMessage(conversationId, assistantMessage);
@@ -101,7 +190,8 @@ export function useChat() {
           useChatStore.getState().incrementFreeCredits();
         }
 
-        const response = await fetch('/api/chat', {
+        const apiRoute = MODE_API_ROUTES[mode];
+        const response = await fetch(apiRoute, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ messages: apiMessages, conversationId }),
@@ -110,28 +200,18 @@ export function useChat() {
 
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
-
-              // ── Handle free tier limit reached — show AuthModal ────────
           if (errData.error === 'FREE_LIMIT_REACHED') {
             setDeliberating(conversationId, false);
             updateLastAssistantMessage(
               conversationId,
-              `You've used all ${errData.creditsMax || FREE_TIER_MAX} free messages! Sign in for unlimited access. Click **Log in** or **Sign up** in the sidebar to continue.`
+              `You've used all ${errData.creditsMax || FREE_TIER_MAX} free messages! Sign in for unlimited access.`
             );
             setIsStreaming(false);
             resetAgentStatuses(conversationId);
             setError('FREE_LIMIT_REACHED');
-            // Redirect to signup page
             router.push('/signup');
             return;
           }
-
-          // ── Handle terminal requires auth ─────────────────────────────
-          if (errData.error === 'SIGN_IN_REQUIRED') {
-            setError('Sign in required for this feature.');
-            return;
-          }
-
           throw new Error(errData.error || `HTTP ${response.status}`);
         }
 
@@ -162,18 +242,16 @@ export function useChat() {
               const parsed = JSON.parse(data);
               const eventType = parsed.type;
 
-              // ── Committee deliberation events ────────────────────────
-              if (eventType === 'deliberation') {
+              // ── Committee deliberation events (code mode only) ────────
+              if (eventType === 'deliberation' && isCodeMode) {
                 if (parsed.status === 'started') {
                   setDeliberating(conversationId, true);
-                } else if (parsed.status === 'synthesizing') {
-                  // Still deliberating, now synthesizing
                 } else if (parsed.status === 'complete') {
                   setDeliberating(conversationId, false);
                 }
               }
 
-              if (eventType === 'agent_update') {
+              if (eventType === 'agent_update' && isCodeMode) {
                 setAgentStatus(conversationId, parsed.agent, parsed.status);
               }
 
@@ -183,15 +261,15 @@ export function useChat() {
                 updateLastAssistantMessage(conversationId, fullContent);
               }
 
-              // ── Tool execution events ────────────────────────────────
-              if (eventType === 'tool_start') {
+              // ── Tool execution events (code mode only) ────────────────
+              if (eventType === 'tool_start' && isCodeMode) {
                 toolExecuted = true;
                 const toolLabel = getToolLabel(parsed.tool, parsed.path, parsed.command);
                 fullContent += `\n\n${toolLabel}\n`;
                 updateLastAssistantMessage(conversationId, fullContent);
               }
 
-              if (eventType === 'tool_result' && parsed.result) {
+              if (eventType === 'tool_result' && isCodeMode) {
                 const resultText = formatToolResult(parsed.tool, parsed.result);
                 fullContent += `${resultText}\n`;
                 updateLastAssistantMessage(conversationId, fullContent);
@@ -258,7 +336,7 @@ export function useChat() {
         abortControllerRef.current = null;
       }
     },
-    [activeConversationId, addConversation, addMessage, updateLastAssistantMessage, setIsStreaming, updateConversationTitle, refreshFiles, setDeliberating, setAgentStatus, resetAgentStatuses, router]
+    [activeConversationId, activeMode, addConversation, addMessage, updateLastAssistantMessage, setIsStreaming, updateConversationTitle, refreshFiles, setDeliberating, setAgentStatus, resetAgentStatuses, addImageToMessage, router]
   );
 
   const stopStreaming = useCallback(() => {

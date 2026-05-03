@@ -1,6 +1,16 @@
 import { create } from 'zustand';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
+export type ChatMode = 'code' | 'iluma' | 'health' | 'chat';
+
+export interface GeneratedImage {
+  id: string;
+  prompt: string;
+  url: string;       // base64 data URL or server path
+  width?: number;
+  height?: number;
+  createdAt: string;
+}
 
 export interface Message {
   id: string;
@@ -8,15 +18,18 @@ export interface Message {
   content: string;
   thinking?: string;
   isThinking?: boolean;
-  // Committee state
+  // Committee state (code mode only)
   isDeliberating?: boolean;
   agentStatuses?: Record<string, 'idle' | 'working' | 'done' | 'error'>;
+  // Image generation (iluma mode only)
+  images?: GeneratedImage[];
   createdAt?: string;
 }
 
 export interface Conversation {
   id: string;
   title: string;
+  mode: ChatMode;
   messages: Message[];
   createdAt: string;
   updatedAt: string;
@@ -25,6 +38,7 @@ export interface Conversation {
 interface ChatState {
   conversations: Conversation[];
   activeConversationId: string | null;
+  activeMode: ChatMode;
   isStreaming: boolean;
   sidebarOpen: boolean;
   themeMode: ThemeMode;
@@ -33,6 +47,7 @@ interface ChatState {
 
   setConversations: (conversations: Conversation[]) => void;
   setActiveConversation: (id: string | null) => void;
+  setActiveMode: (mode: ChatMode) => void;
   setIsStreaming: (streaming: boolean) => void;
   setSidebarOpen: (open: boolean) => void;
   setThemeMode: (mode: ThemeMode) => void;
@@ -53,6 +68,9 @@ interface ChatState {
   setDeliberating: (conversationId: string, value: boolean) => void;
   setAgentStatus: (conversationId: string, agent: string, status: 'idle' | 'working' | 'done' | 'error') => void;
   resetAgentStatuses: (conversationId: string) => void;
+
+  // Image generation methods (iluma mode)
+  addImageToMessage: (conversationId: string, image: GeneratedImage) => void;
 
   getActiveConversation: () => Conversation | undefined;
 }
@@ -77,6 +95,7 @@ function applyTheme(mode: ThemeMode) {
 export const useChatStore = create<ChatState>((set, get) => ({
   conversations: [],
   activeConversationId: null,
+  activeMode: 'code',
   isStreaming: false,
   sidebarOpen: true,
   themeMode: getInitialTheme(),
@@ -94,6 +113,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setConversations: (conversations) => set({ conversations }),
   setActiveConversation: (id) => set({ activeConversationId: id }),
+  setActiveMode: (mode) => set({ activeMode: mode }),
   setIsStreaming: (streaming) => set({ isStreaming: streaming }),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
 
@@ -226,6 +246,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
             ...messages[lastIdx],
             agentStatuses: { architect: 'idle', security: 'idle', optimizer: 'idle' },
             isDeliberating: false,
+          };
+        }
+        return { ...c, messages };
+      }),
+    })),
+
+  // Image generation methods (iluma mode)
+  addImageToMessage: (conversationId, image) =>
+    set((state) => ({
+      conversations: state.conversations.map((c) => {
+        if (c.id !== conversationId) return c;
+        const messages = [...c.messages];
+        const lastIdx = messages.length - 1;
+        if (lastIdx >= 0 && messages[lastIdx].role === 'assistant') {
+          const prev = messages[lastIdx];
+          messages[lastIdx] = {
+            ...prev,
+            images: [...(prev.images || []), image],
           };
         }
         return { ...c, messages };

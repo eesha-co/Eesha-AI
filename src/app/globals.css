@@ -285,13 +285,15 @@ textarea:focus-visible {
   position: relative;
 }
 
+/* The mode-specific gradient is handled inline via Tailwind classes.
+   This ::before serves as a subtle fallback glow. */
 .input-hero::before {
   content: '';
   position: absolute;
   inset: -1px;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.5), rgba(52, 211, 153, 0.5), rgba(96, 165, 250, 0.3));
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(52, 211, 153, 0.3), rgba(96, 165, 250, 0.2));
   background-size: 200% 200%;
   animation: gradient-border 4s ease infinite;
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);

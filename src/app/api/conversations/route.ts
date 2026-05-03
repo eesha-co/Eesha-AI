@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       id: 'anon-' + Date.now(),
       title: 'New Chat',
+      mode: 'code',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       messages: [],
@@ -42,17 +43,17 @@ export async function POST(req: NextRequest) {
   }
 
   if (!isDatabaseAvailable()) {
-    return NextResponse.json({ id: 'temp-' + Date.now(), title: 'New Chat', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), messages: [] });
+    return NextResponse.json({ id: 'temp-' + Date.now(), title: 'New Chat', mode: 'code', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), messages: [] });
   }
   try {
-    const { title } = await req.json();
+    const { title, mode } = await req.json();
     const conversation = await db.conversation.create({
-      data: { title: title || 'New Chat', userId },
+      data: { title: title || 'New Chat', userId, mode: mode || 'code' },
     });
     return NextResponse.json(conversation);
   } catch (error) {
     console.error('Failed to create conversation:', error);
-    return NextResponse.json({ id: 'temp-' + Date.now(), title: 'New Chat', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), messages: [] });
+    return NextResponse.json({ id: 'temp-' + Date.now(), title: 'New Chat', mode: 'code', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), messages: [] });
   }
 }
 

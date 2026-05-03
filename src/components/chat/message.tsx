@@ -4,9 +4,10 @@ import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Copy, Check, RefreshCw, Brain, ChevronDown, ChevronRight, Sparkles, Shield, ShieldCheck, Zap, ShieldAlert } from 'lucide-react';
+import { Copy, Check, RefreshCw, Brain, ChevronDown, ChevronRight, Sparkles, Shield, ShieldCheck, Zap, ShieldAlert, Heart, MessageCircle, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CodeBlock } from '@/components/chat/code-block';
+import { ImageMessage } from '@/components/chat/image-message';
 import type { Message as MessageType } from '@/stores/chat-store';
 
 interface MessageProps {
@@ -226,6 +227,8 @@ export function Message({ message, isStreaming, onRegenerate }: MessageProps) {
   }
 
   // Assistant message — clean, no border-l noise
+  const hasImages = message.images && message.images.length > 0;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -244,7 +247,7 @@ export function Message({ message, isStreaming, onRegenerate }: MessageProps) {
           <ThinkingIndicator />
         ) : (
           <>
-            {/* Committee deliberation animation */}
+            {/* Committee deliberation animation (code mode only) */}
             <AnimatePresence>
               {message.isDeliberating && message.agentStatuses && (
                 <CommitteeDeliberation agentStatuses={message.agentStatuses} />
@@ -254,6 +257,11 @@ export function Message({ message, isStreaming, onRegenerate }: MessageProps) {
             {/* Thinking/reasoning (legacy) */}
             {message.thinking && !message.isDeliberating && (
               <ThinkingBubble thinking={message.thinking} isThinking={message.isThinking} />
+            )}
+
+            {/* Image gallery (iluma mode) */}
+            {hasImages && (
+              <ImageMessage images={message.images!} isStreaming={isStreaming && !message.content} />
             )}
 
             {/* Final answer content — clean, no left border */}

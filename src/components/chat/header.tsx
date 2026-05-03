@@ -3,6 +3,7 @@
 import { useChatStore } from '@/stores/chat-store';
 import { PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ModeSelector } from '@/components/chat/mode-selector';
 
 export function Header() {
   const { sidebarOpen, setSidebarOpen, activeConversationId, conversations } = useChatStore();
@@ -25,10 +26,12 @@ export function Header() {
           <img src="/splash-screen.png" alt="Eesha AI" className="h-9 w-auto object-contain opacity-50" />
         </>
       )}
-      {showTitle && (
+      {showTitle ? (
         <h1 className="max-w-[300px] sm:max-w-[400px] truncate text-[13px] font-normal text-foreground/30">
           {activeConversation.title}
         </h1>
+      ) : (
+        <ModeSelector />
       )}
     </div>
   );

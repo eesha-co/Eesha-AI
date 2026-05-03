@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useChatStore, ThemeMode, Conversation } from '@/stores/chat-store';
-import { Plus, MessageSquare, Trash2, PanelLeftClose, Search, Settings, X, Sun, Moon, Monitor, LogOut, User, LogIn, Sparkles } from 'lucide-react';
+import { useChatStore, ThemeMode, Conversation, ChatMode } from '@/stores/chat-store';
+import { Plus, MessageSquare, Trash2, PanelLeftClose, Search, Settings, X, Sun, Moon, Monitor, LogOut, User, LogIn, Sparkles, Code2, Image, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useSession, signOut } from 'next-auth/react';
@@ -17,6 +17,29 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+
+// ─── Mode icon helper ──────────────────────────────────────────────────────────
+function ModeIcon({ mode, className }: { mode: ChatMode; className?: string }) {
+  switch (mode) {
+    case 'code':
+      return <Code2 className={className} />;
+    case 'iluma':
+      return <Image className={className} />;
+    case 'health':
+      return <Heart className={className} />;
+    case 'chat':
+      return <MessageSquare className={className} />;
+    default:
+      return <MessageSquare className={className} />;
+  }
+}
+
+const MODE_LABELS: Record<ChatMode, string> = {
+  code: 'Code',
+  iluma: 'iluma',
+  health: 'Health',
+  chat: 'Chat',
+};
 
 function groupConversationsByDate(conversations: Conversation[]) {
   const now = new Date();
@@ -82,6 +105,8 @@ export function Sidebar() {
     setSidebarOpen,
     setActiveConversation,
     deleteConversation,
+    activeMode,
+    setActiveMode,
   } = useChatStore();
 
   const { data: session } = useSession();
@@ -101,6 +126,7 @@ export function Sidebar() {
 
   const handleNewChat = () => {
     setActiveConversation(null);
+    // Mode is already set by activeMode — new chat will inherit it
   };
 
   const handleDelete = async () => {
@@ -206,14 +232,18 @@ export function Sidebar() {
                   {group.conversations.map((conv) => (
                     <button
                       key={conv.id}
-                      onClick={() => setActiveConversation(conv.id)}
+                      onClick={() => {
+                        setActiveConversation(conv.id);
+                        // Switch to the conversation's mode when clicking it
+                        if (conv.mode) setActiveMode(conv.mode);
+                      }}
                       className={`group relative flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-all duration-150 ${
                         activeConversationId === conv.id
                           ? 'sidebar-item-active text-foreground'
                           : 'text-foreground/40 hover:text-foreground/70 hover:bg-foreground/[0.03]'
                       }`}
                     >
-                      <MessageSquare className="size-3 shrink-0 opacity-30" />
+                      <ModeIcon mode={conv.mode || 'code'} className="size-3 shrink-0 opacity-30" />
                       <span className="flex-1 truncate text-[13px]">{conv.title}</span>
                       <span
                         onClick={(e) => {

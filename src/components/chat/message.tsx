@@ -207,7 +207,7 @@ export function Message({ message, isStreaming, onRegenerate }: MessageProps) {
       >
         <div className="group relative max-w-[85%] sm:max-w-[70%]">
           {/* User message — subtle, not heavy gradient */}
-          <div className="rounded-2xl rounded-tr-sm bg-[var(--surface-secondary)] px-4 py-2.5 text-[14px] leading-relaxed text-foreground/80">
+          <div className="rounded-2xl rounded-tr-sm bg-[var(--surface-secondary)] px-4 py-2.5 text-[14px] leading-relaxed text-[var(--text-primary)]">
             {message.content}
           </div>
           <div className="absolute -bottom-6 right-0 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -215,7 +215,7 @@ export function Message({ message, isStreaming, onRegenerate }: MessageProps) {
               variant="ghost"
               size="icon"
               onClick={handleCopy}
-              className="size-5 text-foreground/20 hover:text-foreground/50"
+              className="size-5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
               title="Copy"
             >
               {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
@@ -321,7 +321,7 @@ export function Message({ message, isStreaming, onRegenerate }: MessageProps) {
               variant="ghost"
               size="icon"
               onClick={handleCopy}
-              className="size-5 text-foreground/15 hover:text-foreground/40"
+              className="size-5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
               title="Copy"
             >
               {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
@@ -331,7 +331,7 @@ export function Message({ message, isStreaming, onRegenerate }: MessageProps) {
                 variant="ghost"
                 size="icon"
                 onClick={onRegenerate}
-                className="size-5 text-foreground/15 hover:text-foreground/40"
+                className="size-5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
                 title="Regenerate"
               >
                 <RefreshCw className="size-3" />

@@ -113,7 +113,7 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
           transition={{ duration: 0.7, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
           className="text-center mb-2"
         >
-          <h2 className="text-3xl sm:text-4xl font-extralight text-foreground/90 tracking-tight">
+          <h2 className="text-3xl sm:text-4xl font-light text-[var(--text-primary)] tracking-tight">
             {heading}
           </h2>
         </motion.div>
@@ -123,7 +123,7 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.25 }}
-          className="text-[13px] text-foreground/25 mb-10 tracking-wide"
+          className="text-[13px] text-[var(--text-tertiary)] mb-10 tracking-wide"
         >
           {tagline}
         </motion.p>
@@ -144,7 +144,7 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.4 + index * 0.04 }}
                 onClick={() => handleClick(suggestion)}
-                className="group flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 backdrop-blur-sm px-3 py-3 text-[13px] text-foreground/50 transition-all duration-200 hover:bg-[var(--surface-secondary)]/50 hover:text-foreground/80 hover:border-foreground/10"
+                className="group flex items-center gap-2 rounded-xl border border-[var(--border-medium)] bg-[var(--surface-secondary)]/40 backdrop-blur-sm px-3 py-3 text-[13px] text-[var(--text-secondary)] transition-all duration-200 hover:bg-[var(--surface-secondary)]/70 hover:text-[var(--text-primary)] hover:border-[var(--border)]"
               >
                 <Icon className="size-3.5 shrink-0 opacity-50 group-hover:opacity-80 transition-opacity" />
                 <span className="truncate">{suggestion.title}</span>

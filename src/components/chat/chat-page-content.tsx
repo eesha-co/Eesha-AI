@@ -212,11 +212,11 @@ export function ChatPageContent({ initialConversationId }: ChatPageContentProps)
 
           {/* Side panel area — desktop, code mode only */}
           {hasSidePanel && (
-            <div className="hidden sm:flex flex-col w-1/2 min-w-0 overflow-hidden border-l border-[var(--border-subtle)]">
+            <div className="hidden sm:flex flex-col w-1/2 min-w-0 overflow-hidden border-l border-[var(--border-medium)]">
               {showWorkspace && !showTerminal && (
                 <div className="flex flex-1 min-h-0 overflow-hidden">
                   <div className="w-52 shrink-0 overflow-hidden"><FileExplorer /></div>
-                  <div className="flex-1 min-w-0 overflow-hidden border-l border-[var(--border-subtle)]"><CodeEditor /></div>
+                  <div className="flex-1 min-w-0 overflow-hidden border-l border-[var(--border-medium)]"><CodeEditor /></div>
                 </div>
               )}
 
@@ -228,9 +228,9 @@ export function ChatPageContent({ initialConversationId }: ChatPageContentProps)
                 <>
                   <div className="flex flex-1 min-h-0 overflow-hidden">
                     <div className="w-44 shrink-0 overflow-hidden"><FileExplorer /></div>
-                    <div className="flex-1 min-w-0 overflow-hidden border-l border-[var(--border-subtle)]"><CodeEditor /></div>
+                    <div className="flex-1 min-w-0 overflow-hidden border-l border-[var(--border-medium)]"><CodeEditor /></div>
                   </div>
-                  <div className="h-48 shrink-0 border-t border-[var(--border-subtle)] overflow-hidden">
+                  <div className="h-48 shrink-0 border-t border-[var(--border-medium)] overflow-hidden">
                     <TerminalPanel />
                   </div>
                 </>
@@ -257,7 +257,7 @@ export function ChatPageContent({ initialConversationId }: ChatPageContentProps)
                       <div className="w-16 shrink-0 overflow-hidden"><FileExplorer /></div>
                       <div className="flex-1 min-w-0 overflow-hidden"><CodeEditor /></div>
                     </div>
-                    <div className="h-48 shrink-0 border-t border-[var(--border-subtle)] overflow-hidden">
+                    <div className="h-48 shrink-0 border-t border-[var(--border-medium)] overflow-hidden">
                       <TerminalPanel />
                     </div>
                   </>

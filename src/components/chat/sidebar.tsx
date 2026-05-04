@@ -229,7 +229,7 @@ export function Sidebar() {
         animate={{ width: sidebarOpen ? 260 : 0, opacity: sidebarOpen ? 1 : 0 }}
         transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
         className={`relative flex-shrink-0 overflow-hidden bg-background/60 backdrop-blur-2xl z-50 ${
-          sidebarOpen ? 'md:relative fixed inset-y-0 left-0 md:border-r border-[var(--border-subtle)]' : ''
+          sidebarOpen ? 'md:relative fixed inset-y-0 left-0 md:border-r border-[var(--border-medium)]' : ''
         }`}
         style={{ maxWidth: sidebarOpen ? 260 : 0 }}
       >
@@ -240,7 +240,7 @@ export function Sidebar() {
             <Button
               variant="ghost"
               size="icon"
-              className="size-6 text-foreground/20 hover:text-foreground/50"
+              className="size-6 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
               onClick={() => setSidebarOpen(false)}
             >
               <PanelLeftClose className="size-3.5" />
@@ -251,7 +251,7 @@ export function Sidebar() {
           <div className="px-3 pb-2">
             <button
               onClick={handleNewChat}
-              className="group flex w-full items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-transparent px-3 py-2 text-[13px] text-foreground/50 transition-all duration-200 hover:text-foreground/80 hover:border-foreground/10 hover:bg-[var(--surface-secondary)]/50"
+              className="group flex w-full items-center gap-2 rounded-lg border border-[var(--border-medium)] bg-transparent px-3 py-2 text-[13px] text-[var(--text-secondary)] transition-all duration-200 hover:text-[var(--text-primary)] hover:border-[var(--border)] hover:bg-[var(--surface-secondary)]/50"
             >
               <Plus className="size-3.5" />
               <span>New Chat</span>
@@ -259,11 +259,11 @@ export function Sidebar() {
           </div>
 
           {/* Separator */}
-          <div className="mx-3 border-t border-[var(--border-subtle)]" />
+          <div className="mx-3 border-t border-[var(--border-medium)]" />
 
           {/* Mode Navigation Section */}
           <div className="px-2 py-2">
-            <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-foreground/20">
+            <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
               Modes
             </div>
             <div className="space-y-0.5">
@@ -276,7 +276,7 @@ export function Sidebar() {
                     className={`group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-all duration-150 ${
                       isActive
                         ? `${MODE_ACTIVE_COLORS[mode]} ${MODE_ACTIVE_BG[mode]} font-medium`
-                        : `text-foreground/40 ${MODE_HOVER_BG[mode]} hover:text-foreground/70`
+                        : `text-[var(--text-secondary)] ${MODE_HOVER_BG[mode]} hover:text-[var(--text-primary)]`
                     }`}
                   >
                     <ModeIcon mode={mode} className="size-4" />
@@ -297,23 +297,23 @@ export function Sidebar() {
           </div>
 
           {/* Separator */}
-          <div className="mx-3 border-t border-[var(--border-subtle)]" />
+          <div className="mx-3 border-t border-[var(--border-medium)]" />
 
           {/* Search — compact */}
           <div className="px-3 py-2">
             <div className="relative">
-              <Search className="absolute left-2 top-1/2 size-3 -translate-y-1/2 text-foreground/20" />
+              <Search className="absolute left-2 top-1/2 size-3 -translate-y-1/2 text-[var(--text-tertiary)]" />
               <input
                 type="text"
                 placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-md border border-[var(--border-subtle)] bg-transparent py-1.5 pl-7 pr-7 text-[12px] text-foreground placeholder-foreground/20 outline-none transition-all focus:border-foreground/10 focus:bg-[var(--surface-secondary)]/30"
+                className="w-full rounded-md border border-[var(--border-medium)] bg-transparent py-1.5 pl-7 pr-7 text-[12px] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none transition-all focus:border-[var(--primary)] focus:bg-[var(--surface-secondary)]/30"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground/20 hover:text-foreground/50"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                 >
                   <X className="size-3" />
                 </button>
@@ -326,7 +326,7 @@ export function Sidebar() {
             <div className="py-0.5">
               {grouped.map((group) => (
                 <div key={group.label} className="mb-2">
-                  <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-foreground/20">
+                  <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
                     {group.label}
                   </div>
                   {group.conversations.map((conv) => (
@@ -335,11 +335,11 @@ export function Sidebar() {
                       onClick={() => handleConversationClick(conv)}
                       className={`group relative flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-all duration-150 ${
                         activeConversationId === conv.id
-                          ? 'sidebar-item-active text-foreground'
-                          : 'text-foreground/40 hover:text-foreground/70 hover:bg-foreground/[0.03]'
+                          ? 'sidebar-item-active text-[var(--text-primary)]'
+                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]'
                       }`}
                     >
-                      <ModeIcon mode={conv.mode || 'code'} className="size-3 shrink-0 opacity-30" />
+                      <ModeIcon mode={conv.mode || 'code'} className="size-3 shrink-0 opacity-50" />
                       <span className="flex-1 truncate text-[13px]">{conv.title}</span>
                       <span
                         onClick={(e) => {
@@ -348,7 +348,7 @@ export function Sidebar() {
                         }}
                         className="shrink-0 rounded p-0.5 opacity-0 transition-all hover:bg-red-500/10 group-hover:opacity-100"
                       >
-                        <Trash2 className="size-2.5 text-foreground/20 hover:text-red-400" />
+                        <Trash2 className="size-2.5 text-[var(--text-tertiary)] hover:text-red-400" />
                       </span>
                     </button>
                   ))}
@@ -356,7 +356,7 @@ export function Sidebar() {
               ))}
               {filteredConversations.length === 0 && (
                 <div className="px-3 py-6 text-center">
-                  <p className="text-[11px] text-foreground/20">
+                  <p className="text-[11px] text-[var(--text-tertiary)]">
                     {searchQuery ? 'No matching conversations' : `No ${MODE_LABELS[activeMode]} conversations yet`}
                   </p>
                 </div>
@@ -365,22 +365,22 @@ export function Sidebar() {
           </ScrollArea>
 
           {/* Footer */}
-          <div className="border-t border-[var(--border-subtle)] px-3 py-2.5">
+          <div className="border-t border-[var(--border-medium)] px-3 py-2.5">
             <div className="mb-2">
               <ThemeToggle />
             </div>
 
             {session?.user ? (
-              <div className="flex items-center gap-2 rounded-md bg-foreground/[0.03] px-2 py-1.5">
+              <div className="flex items-center gap-2 rounded-md bg-[var(--surface-secondary)] px-2 py-1.5">
                 <div className="flex size-7 items-center justify-center rounded-full bg-foreground text-[11px] font-semibold text-background">
                   {session.user.name?.[0]?.toUpperCase() || <User className="size-3.5" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="truncate text-[12px] text-foreground/70">{session.user.name || 'User'}</p>
+                  <p className="truncate text-[12px] text-[var(--text-secondary)]">{session.user.name || 'User'}</p>
                 </div>
                 <button
                   onClick={handleSignOut}
-                  className="shrink-0 rounded p-1 text-foreground/20 transition-colors hover:text-red-400"
+                  className="shrink-0 rounded p-1 text-[var(--text-tertiary)] transition-colors hover:text-red-400"
                   title="Sign out"
                 >
                   <LogOut className="size-3.5" />
@@ -396,7 +396,7 @@ export function Sidebar() {
                 </button>
                 <button
                   onClick={() => window.location.href = '/login'}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-[var(--border-subtle)] py-1.5 text-[12px] text-foreground/50 transition-all hover:text-foreground/80 hover:border-foreground/10"
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-[var(--border-medium)] py-1.5 text-[12px] text-[var(--text-secondary)] transition-all hover:text-[var(--text-primary)] hover:border-[var(--border)]"
                 >
                   Log in
                 </button>
@@ -404,7 +404,7 @@ export function Sidebar() {
             )}
 
             <div className="mt-2 flex items-center gap-1.5">
-              <button className="flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-foreground/25 transition-colors hover:text-foreground/50">
+              <button className="flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-secondary)]">
                 <Settings className="size-3.5" />
                 Settings
               </button>

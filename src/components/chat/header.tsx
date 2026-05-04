@@ -42,7 +42,7 @@ export function Header() {
           <Button
             variant="ghost"
             size="icon"
-            className="size-7 text-foreground/20 hover:text-foreground/50"
+            className="size-7 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
             onClick={() => setSidebarOpen(true)}
           >
             <PanelLeft className="size-3.5" />
@@ -51,7 +51,7 @@ export function Header() {
         </>
       )}
       {showTitle ? (
-        <h1 className="max-w-[300px] sm:max-w-[400px] truncate text-[13px] font-normal text-foreground/30">
+        <h1 className="max-w-[300px] sm:max-w-[400px] truncate text-[13px] font-normal text-[var(--text-secondary)]">
           {activeConversation.title}
         </h1>
       ) : (

@@ -2,11 +2,8 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Square, Sparkles, Image, Heart, MessageCircle, Code2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Send, Square, Image } from 'lucide-react';
 import { useChatStore, ChatMode } from '@/stores/chat-store';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 
 interface InputAreaProps {
   onSend: (content: string) => void;
@@ -36,22 +33,17 @@ const MODE_DOT_COLORS: Record<ChatMode, string> = {
 };
 
 const MODE_GRADIENT_BORDERS: Record<ChatMode, string> = {
-  code: 'from-violet-500/40 via-emerald-500/30 to-violet-500/40',
-  iluma: 'from-emerald-500/40 via-cyan-500/30 to-emerald-500/40',
-  health: 'from-rose-500/40 via-pink-500/30 to-rose-500/40',
-  chat: 'from-blue-500/40 via-violet-500/30 to-blue-500/40',
+  code: 'from-violet-500/50 via-emerald-500/40 to-violet-500/50',
+  iluma: 'from-emerald-500/50 via-cyan-500/40 to-emerald-500/50',
+  health: 'from-rose-500/50 via-pink-500/40 to-rose-500/50',
+  chat: 'from-blue-500/50 via-violet-500/40 to-blue-500/50',
 };
 
 export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
   const [input, setInput] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { freeCreditsUsed, activeMode } = useChatStore();
-  const { data: session } = useSession();
-  const router = useRouter();
-  const FREE_TIER_MAX = 5;
-  const isAuthenticated = !!session?.user;
-  const creditsRemaining = Math.max(0, FREE_TIER_MAX - freeCreditsUsed);
+  const { activeMode } = useChatStore();
 
   const colors = MODE_COLORS[activeMode];
   const dotColor = MODE_DOT_COLORS[activeMode];
@@ -93,19 +85,20 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
   return (
     <div className="shrink-0 px-4 pb-4 pt-2 relative" style={{ zIndex: 2 }}>
       <div className="mx-auto max-w-[720px]">
-        {/* Input container — always rounded-2xl, cleaner shape */}
+        {/* Input container */}
         <div className="input-hero relative transition-all duration-300 rounded-2xl">
-          {/* Animated gradient border */}
+          {/* Animated gradient border — visible on focus/content */}
           <div className={`absolute inset-0 rounded-[inherit] transition-opacity duration-500 ${
             hasContent || isFocused ? 'opacity-100' : 'opacity-0'
           }`}>
             <div className={`absolute inset-0 rounded-[inherit] animate-gradient-border bg-gradient-to-r ${gradientBorder} bg-[length:200%_200%]`} />
           </div>
 
+          {/* Main input border — VISIBLE in both light and dark mode */}
           <div className={`relative rounded-[inherit] border transition-all duration-300 ${
             hasContent || isFocused
-              ? 'border-white/10 dark:border-white/8 bg-white/15 dark:bg-white/[0.04] backdrop-blur-2xl shadow-lg shadow-black/10 dark:shadow-black/30'
-              : 'border-white/6 dark:border-white/[0.04] bg-white/10 dark:bg-white/[0.03] backdrop-blur-xl'
+              ? 'border-[var(--border-medium)] bg-[var(--surface-primary)]/80 backdrop-blur-xl shadow-lg shadow-black/5 dark:shadow-black/20'
+              : 'border-[var(--border)] bg-[var(--surface-primary)]/60 backdrop-blur-sm hover:border-[var(--border-medium)]'
           }`}>
             <div className="flex items-end gap-3 px-5 py-3.5">
               {/* Mode indicator dot */}
@@ -124,7 +117,7 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
                 />
               </div>
 
-              {/* Textarea */}
+              {/* Textarea — high contrast text */}
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -134,7 +127,7 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
                 onBlur={() => setIsFocused(false)}
                 placeholder={MODE_PLACEHOLDERS[activeMode]}
                 rows={1}
-                className="max-h-[200px] min-h-[28px] flex-1 resize-none bg-transparent text-[15px] leading-relaxed text-foreground placeholder-foreground/30 outline-none"
+                className="max-h-[200px] min-h-[28px] flex-1 resize-none bg-transparent text-[15px] leading-relaxed text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none"
               />
 
               {/* Send / Stop button */}
@@ -150,7 +143,7 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
                   >
                     <button
                       onClick={onStop}
-                      className="flex size-9 items-center justify-center rounded-xl bg-foreground/10 text-foreground/70 transition-all hover:bg-foreground/15 hover:text-foreground"
+                      className="flex size-9 items-center justify-center rounded-xl bg-[var(--surface-secondary)] text-[var(--text-secondary)] transition-all hover:bg-[var(--surface-tertiary)] hover:text-[var(--text-primary)]"
                       title="Stop generating"
                     >
                       <Square className="size-3" fill="currentColor" />
@@ -171,7 +164,7 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
                       className={`flex size-9 items-center justify-center rounded-xl transition-all duration-200 ${
                         hasContent
                           ? `bg-gradient-to-br ${colors.from} ${colors.to} text-white hover:opacity-90 shadow-md ${colors.shadow}`
-                          : 'bg-foreground/8 text-foreground/20 cursor-default'
+                          : 'bg-[var(--surface-secondary)] text-[var(--text-tertiary)] cursor-default'
                       }`}
                       title={activeMode === 'iluma' ? 'Generate image' : 'Send message'}
                     >
@@ -190,27 +183,8 @@ export function InputArea({ onSend, onStop, isStreaming }: InputAreaProps) {
 
         {/* Bottom info */}
         <div className="mt-2.5 flex items-center justify-between px-1">
-          <div className="flex items-center gap-1.5">
-            {!isAuthenticated && creditsRemaining <= 2 && creditsRemaining > 0 && (
-              <button
-                onClick={() => router.push('/signup')}
-                className="flex items-center gap-1 text-[11px] text-foreground/20 hover:text-foreground/40 transition-colors"
-              >
-                <Sparkles className="size-3" />
-                {creditsRemaining} free message{creditsRemaining !== 1 ? 's' : ''} left
-              </button>
-            )}
-            {!isAuthenticated && creditsRemaining === 0 && (
-              <button
-                onClick={() => router.push('/signup')}
-                className="flex items-center gap-1 text-[11px] text-foreground/20 hover:text-foreground/40 transition-colors"
-              >
-                <Sparkles className="size-3" />
-                Sign up for unlimited
-              </button>
-            )}
-          </div>
-          <span className="text-[11px] text-foreground/15">
+          <div />
+          <span className="text-[11px] text-[var(--text-tertiary)]">
             {activeMode === 'health'
               ? 'AI is not a doctor. Always consult professionals.'
               : activeMode === 'iluma'

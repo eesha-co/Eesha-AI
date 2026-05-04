@@ -46,23 +46,23 @@
 /* ─── Light Mode ──────────────────────────────────────────── */
 :root {
   --radius: 0.625rem;
-  --background: #f0f0f5;
-  --foreground: #1a1a2e;
+  --background: #f5f5fa;
+  --foreground: #111122;
   --card: #ffffff;
-  --card-foreground: #1a1a2e;
+  --card-foreground: #111122;
   --popover: #ffffff;
-  --popover-foreground: #1a1a2e;
+  --popover-foreground: #111122;
   --primary: #7c3aed;
   --primary-foreground: #ffffff;
-  --secondary: #edeef5;
-  --secondary-foreground: #1a1a2e;
-  --muted: #edeef5;
-  --muted-foreground: #6b7280;
-  --accent: #edeef5;
-  --accent-foreground: #1a1a2e;
+  --secondary: #e8e8f0;
+  --secondary-foreground: #111122;
+  --muted: #e8e8f0;
+  --muted-foreground: #52525b;
+  --accent: #e8e8f0;
+  --accent-foreground: #111122;
   --destructive: #ef4444;
-  --border: rgba(0, 0, 0, 0.08);
-  --input: rgba(0, 0, 0, 0.06);
+  --border: rgba(0, 0, 0, 0.14);
+  --input: rgba(0, 0, 0, 0.10);
   --ring: #7c3aed;
   --chart-1: #7c3aed;
   --chart-2: #06b6d4;
@@ -70,31 +70,31 @@
   --chart-4: #10b981;
   --chart-5: #f59e0b;
   --sidebar: #ffffff;
-  --sidebar-foreground: #1a1a2e;
+  --sidebar-foreground: #111122;
   --sidebar-primary: #7c3aed;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(124, 58, 237, 0.06);
-  --sidebar-accent-foreground: #1a1a2e;
-  --sidebar-border: rgba(0, 0, 0, 0.06);
+  --sidebar-accent: rgba(124, 58, 237, 0.08);
+  --sidebar-accent-foreground: #111122;
+  --sidebar-border: rgba(0, 0, 0, 0.10);
   --sidebar-ring: #7c3aed;
 
-  /* Custom semantic tokens for light mode — soft, premium feel */
+  /* Custom semantic tokens for light mode — high contrast, readable */
   --surface-primary: #ffffff;
-  --surface-secondary: #f7f7fc;
-  --surface-tertiary: #eeeef5;
-  --text-primary: #1a1a2e;
-  --text-secondary: #4b5563;
-  --text-tertiary: #9ca3af;
+  --surface-secondary: #f0f0f8;
+  --surface-tertiary: #e4e4ee;
+  --text-primary: #111122;
+  --text-secondary: #3f3f50;
+  --text-tertiary: #71717a;
   --text-inverse: #ffffff;
-  --border-subtle: rgba(0, 0, 0, 0.04);
-  --border-medium: rgba(0, 0, 0, 0.08);
-  --glow-color: rgba(124, 58, 237, 0.1);
-  --code-bg: rgba(124, 58, 237, 0.06);
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-medium: rgba(0, 0, 0, 0.14);
+  --glow-color: rgba(124, 58, 237, 0.12);
+  --code-bg: rgba(124, 58, 237, 0.07);
   --code-text: #6d28d9;
-  --scrollbar-thumb: rgba(0, 0, 0, 0.12);
-  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.2);
-  --selection-bg: rgba(124, 58, 237, 0.12);
-  --selection-text: #1a1a2e;
+  --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
+  --selection-bg: rgba(124, 58, 237, 0.15);
+  --selection-text: #111122;
   --mint-glass: #34D399;
   --aurora-1: rgba(139, 92, 246, 0.3);
   --aurora-2: rgba(52, 211, 153, 0.3);
@@ -103,55 +103,55 @@
 
 /* ─── Dark Mode ───────────────────────────────────────────── */
 .dark {
-  --background: #0a0a12;
-  --foreground: #e8e8ed;
-  --card: #111118;
-  --card-foreground: #e8e8ed;
-  --popover: #111118;
-  --popover-foreground: #e8e8ed;
+  --background: #09090f;
+  --foreground: #f0f0f5;
+  --card: #12121c;
+  --card-foreground: #f0f0f5;
+  --popover: #12121c;
+  --popover-foreground: #f0f0f5;
   --primary: #8B5CF6;
-  --primary-foreground: #0a0a12;
-  --secondary: #161622;
-  --secondary-foreground: #e8e8ed;
-  --muted: #161622;
-  --muted-foreground: #a1a1aa;
-  --accent: #161622;
-  --accent-foreground: #e8e8ed;
+  --primary-foreground: #09090f;
+  --secondary: #1a1a2a;
+  --secondary-foreground: #f0f0f5;
+  --muted: #1a1a2a;
+  --muted-foreground: #b0b0bc;
+  --accent: #1a1a2a;
+  --accent-foreground: #f0f0f5;
   --destructive: #ef4444;
-  --border: rgba(255, 255, 255, 0.06);
-  --input: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.12);
+  --input: rgba(255, 255, 255, 0.10);
   --ring: #8B5CF6;
   --chart-1: #8B5CF6;
   --chart-2: #22d3ee;
   --chart-3: #f472b6;
   --chart-4: #34d399;
   --chart-5: #fbbf24;
-  --sidebar: #111118;
-  --sidebar-foreground: #e8e8ed;
+  --sidebar: #12121c;
+  --sidebar-foreground: #f0f0f5;
   --sidebar-primary: #8B5CF6;
-  --sidebar-primary-foreground: #0a0a12;
-  --sidebar-accent: rgba(255, 255, 255, 0.04);
-  --sidebar-accent-foreground: #e8e8ed;
-  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-primary-foreground: #09090f;
+  --sidebar-accent: rgba(255, 255, 255, 0.06);
+  --sidebar-accent-foreground: #f0f0f5;
+  --sidebar-border: rgba(255, 255, 255, 0.10);
   --sidebar-ring: #8B5CF6;
 
-  /* Custom semantic tokens — Cyber-Linen palette */
-  --surface-primary: #111118;
-  --surface-secondary: #161622;
-  --surface-tertiary: #1c1c2e;
-  --text-primary: #e8e8ed;
-  --text-secondary: #a1a1aa;
-  --text-tertiary: #71717a;
-  --text-inverse: #0a0a12;
-  --border-subtle: rgba(255, 255, 255, 0.04);
-  --border-medium: rgba(255, 255, 255, 0.08);
-  --glow-color: rgba(139, 92, 246, 0.15);
-  --code-bg: rgba(255, 255, 255, 0.06);
+  /* Custom semantic tokens — high contrast for readability */
+  --surface-primary: #12121c;
+  --surface-secondary: #1a1a2a;
+  --surface-tertiary: #222236;
+  --text-primary: #f0f0f5;
+  --text-secondary: #b0b0bc;
+  --text-tertiary: #8888a0;
+  --text-inverse: #09090f;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-medium: rgba(255, 255, 255, 0.14);
+  --glow-color: rgba(139, 92, 246, 0.18);
+  --code-bg: rgba(255, 255, 255, 0.08);
   --code-text: #67e8f9;
-  --scrollbar-thumb: rgba(255, 255, 255, 0.06);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.12);
-  --selection-bg: rgba(139, 92, 246, 0.3);
-  --selection-text: #e8e8ed;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.10);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.18);
+  --selection-bg: rgba(139, 92, 246, 0.35);
+  --selection-text: #f0f0f5;
   --mint-glass: #34D399;
   --aurora-1: rgba(139, 92, 246, 0.3);
   --aurora-2: rgba(52, 211, 153, 0.3);
@@ -192,10 +192,10 @@
   color: var(--selection-text);
 }
 
-/* ─── Focus rings — subtle, premium ───────────────────────── */
+/* ─── Focus rings ───────────────────────────────────────── */
 :focus-visible {
-  outline: 1px solid var(--primary);
-  outline-offset: 1px;
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 input:focus-visible,
@@ -285,8 +285,6 @@ textarea:focus-visible {
   position: relative;
 }
 
-/* The mode-specific gradient is handled inline via Tailwind classes.
-   This ::before serves as a subtle fallback glow. */
 .input-hero::before {
   content: '';
   position: absolute;
@@ -313,7 +311,7 @@ textarea:focus-visible {
 .prose-chat {
   line-height: 1.7;
   font-size: 0.9375rem;
-  color: var(--text-secondary);
+  color: var(--text-primary);
 }
 
 .prose-chat p {
@@ -380,12 +378,12 @@ textarea:focus-visible {
   border-left: 3px solid var(--primary);
   padding-left: 1rem;
   margin: 0.75rem 0;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-style: italic;
 }
 
 .prose-chat hr {
-  border-color: var(--border-subtle);
+  border-color: var(--border-medium);
   margin: 1rem 0;
 }
 
@@ -421,6 +419,7 @@ textarea:focus-visible {
 /* ===== Prose-thinking ===== */
 .prose-thinking {
   line-height: 1.6;
+  color: var(--text-secondary);
 }
 
 .prose-thinking p {
@@ -441,7 +440,7 @@ textarea:focus-visible {
 
 /* ===== Code block container — theme-aware ===== */
 .code-block-container {
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-medium);
   border-radius: 0.75rem;
   background: var(--surface-primary);
   overflow: hidden;
@@ -463,13 +462,13 @@ textarea:focus-visible {
 
 /* ===== Sidebar item active ===== */
 .sidebar-item-active {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(52, 211, 153, 0.05));
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.10), rgba(52, 211, 153, 0.06));
 }
 
 :root .sidebar-item-active {
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.06), rgba(52, 211, 153, 0.03));
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(52, 211, 153, 0.04));
 }
 
 .dark .sidebar-item-active {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(52, 211, 153, 0.05));
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.10), rgba(52, 211, 153, 0.06));
 }
